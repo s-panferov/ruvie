@@ -1,0 +1,19 @@
+[package]
+name = "simple"
+version = "0.1.0"
+authors = ["Stanislav Panferov <stanislav.panferov@revjet.com>"]
+edition = "2018"
+
+[dependencies]
+rustweb={path="../../packages/rustweb"}
+wasm-bindgen = "*"
+
+[dependencies.web-sys]
+version = "*"
+features = [
+  'Document',
+  'Element',
+  'HtmlElement',
+  'Node',
+  'Window',
+]
