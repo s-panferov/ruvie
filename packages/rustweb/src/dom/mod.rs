@@ -164,7 +164,9 @@ impl Component for Div {
                     level: ctx.parent.as_ref().map(|p| p.level).unwrap_or(0) + 1,
                 });
 
-                el.append_child(&instance.perform_render()?)?;
+                let child_el = instance.perform_render()?;
+
+                el.append_child(&child_el)?;
                 ctx.add_child(instance);
             }
         }
@@ -218,7 +220,7 @@ impl Component for Text {
     type Target = Html;
 
     fn mount(&self, ctx: &mut MountContext, _children: Children<Html>) -> Result<Node, JsValue> {
-        let el = ctx.doc.create_text_node("");
+        let el = ctx.doc.create_text_node("asdfasf");
         ctx.add_node(&el);
         Ok(el.into())
     }
@@ -226,8 +228,10 @@ impl Component for Text {
     fn update(&self, ctx: UpdateContext<Self::Props>) -> Result<(), JsValue> {
         let UpdateContext { props, .. } = ctx;
 
-        let el: HtmlElement = node(&ctx).unwrap().unchecked_into();
-        el.set_inner_text(&props.value.observe(ctx.eval));
+        let text = props.value.observe(ctx.eval);
+        web_sys::console::log_1(&format!("text update {:#?}", text).into());
+
+        node(&ctx).unwrap().set_node_value(Some(&text));
 
         Ok(())
     }
