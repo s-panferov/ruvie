@@ -1,53 +1,14 @@
-extern crate web_sys;
+mod component;
+mod instance;
+mod layout;
+mod scheduler;
 
-pub enum Change {
-    CreateElement { name: &'static str },
-    SetAttribute { name: &'static str, value: String },
+pub mod dom;
+pub mod prelude {
+    pub use crate::component::FunctionalComponent;
+    pub use crate::layout::LayoutBuilder;
 }
 
-pub trait Component: Sized {
-    type Props;
-    fn render(&self) -> Html;
-    fn create(self, props: Self::Props) -> Element<Self> {
-        Element {
-            spec: self,
-            props,
-            dom_node: None,
-        }
-    }
-}
-
-pub struct Element<C: Component> {
-    spec: C,
-    props: C::Props,
-    dom_node: Option<web_sys::HtmlElement>,
-}
-
-mod native {
-    use super::{Change, Component, Html};
-    pub struct Div {}
-
-    #[derive(Default)]
-    pub struct HttpProps {
-        style: Option<String>,
-    }
-
-    impl Component for Div {
-        type Props = HttpProps;
-        fn render(&self) -> Html {
-            return vec![Change::CreateElement { name: "div" }];
-        }
-    }
-}
-
-mod el {
-    use super::native::{Div, HttpProps};
-    use super::{Component, Html};
-    pub fn div(props: HttpProps) -> Html {
-        Div {}.create(props)
-    }
-}
-
-pub type Html = Vec<Element>;
-
-pub fn render<C: Component>(el: web_sys::HtmlElement, component: C, props: C::Props) {}
+pub use component::{Component, Context, Func};
+pub use instance::InstanceRef;
+pub use layout::{AnyLayout, Child, Children, Layout, LayoutBuilder};
