@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 
-use rustweb::dom::Text;
 use std::sync::Arc;
 
 use observe::transaction;
@@ -84,7 +83,7 @@ fn App(ctx: Context<Arc<AppStore>>) -> Children<Html> {
             }
         })
         .child("Test")
-        .child(Button.create().default())
+        .child(Button.create().default().child("Test"))
         .scope(move |_| "Test")
         .into()
 }
