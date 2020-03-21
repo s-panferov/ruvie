@@ -1,21 +1,25 @@
 use std::sync::{Arc, Weak};
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::{
+    collections::HashSet,
+    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+};
 
 use observe::EvalContext;
-use observe::Tracker;
+use observe::{Tracker, WeakTracker};
 
 use crate::component::Target;
 use crate::layout::Child;
 use crate::layout::Children;
 use crate::scheduler::Scheduler;
 
+#[derive(Clone)]
 pub struct InstanceRef<T: Target> {
     level: usize,
     body: Arc<RwLock<Instance<T>>>,
 }
 
 impl<T: Target> InstanceRef<T> {
-    pub fn new(opts: InstanceOptions<T>) -> Self {
+    pub fn new(opts: InstanceSpec<T>) -> Self {
         let level = opts.level;
         let body = Instance::new(opts);
         let runtime = InstanceRef {
@@ -62,13 +66,22 @@ impl<T: Target> InstanceRef<T> {
     }
 
     pub fn perform_update(&self) -> Result<(), T::Error> {
-        {
-            let rx = self.get().update_rx.clone();
-            rx.get_mut().update();
+        // clone to release self-reference
+        let updated = self.get().updated_rx.clone();
+
+        for rx in updated {
+            let rx = rx.upgrade();
+            if let Some(rx) = rx {
+                rx.get_mut().update();
+                let res = std::mem::replace(&mut self.get_mut().update_res, Ok(()));
+                if res.is_err() {
+                    return res;
+                }
+            }
         }
 
         self.get_mut().update_scheduled = false;
-        std::mem::replace(&mut self.get_mut().update_res, Ok(()))
+        Ok(())
     }
 
     pub fn schedule_render(&self) {
@@ -97,19 +110,20 @@ impl<T: Target> InstanceRef<T> {
 }
 
 pub struct Instance<T: Target> {
-    pub(crate) opts: InstanceOptions<T>,
+    pub(crate) opts: InstanceSpec<T>,
     pub(crate) tree: Children<T>,
     pub(crate) children: Vec<InstanceRef<T>>,
     reference: Option<WeakInstance<T>>,
     render_rx: Tracker,
-    update_rx: Tracker,
-    update_res: Result<(), T::Error>,
     render_scheduled: bool,
     update_scheduled: bool,
+    pub(crate) update_res: Result<(), T::Error>,
+    pub(crate) update_rx: Vec<Tracker>,
+    pub(crate) updated_rx: HashSet<WeakTracker>,
     pub(crate) runtime: Option<T::Runtime>,
 }
 
-pub struct InstanceOptions<T: Target> {
+pub struct InstanceSpec<T: Target> {
     pub scheduler: Scheduler<T>,
     pub parent: Option<WeakInstance<T>>,
     pub layout: Child<T>,
@@ -117,14 +131,15 @@ pub struct InstanceOptions<T: Target> {
 }
 
 impl<T: Target> Instance<T> {
-    pub fn new(opts: InstanceOptions<T>) -> Self {
+    pub fn new(opts: InstanceSpec<T>) -> Self {
         Instance {
             opts,
             children: vec![],
             tree: None.into(),
             reference: None,
             render_rx: Tracker::new("Render".to_owned()),
-            update_rx: Tracker::new("Update".to_owned()),
+            update_rx: vec![],
+            updated_rx: HashSet::new(),
             update_res: Ok(()),
             render_scheduled: false,
             update_scheduled: false,
@@ -159,33 +174,6 @@ impl<T: Target> Instance<T> {
                 }
             }
         });
-
-        let mut update_rx = self.update_rx.get_mut();
-
-        update_rx.set_is_observer();
-        update_rx.set_computation({
-            let instance = self.weak_ref().clone();
-            move |eval: &mut EvalContext| {
-                if let Some(i) = instance.upgrade() {
-                    i.get_mut().update(eval);
-                } else {
-                    unreachable!()
-                }
-                0
-            }
-        });
-
-        update_rx.on_reaction({
-            let rt = self.weak_ref().clone();
-            move || {
-                if let Some(instance) = rt.upgrade() {
-                    // FIXME triggers several times, need to optimize in observe
-                    instance.schedule_update()
-                } else {
-                    unreachable!()
-                }
-            }
-        });
     }
 
     pub fn weak_ref(&self) -> &WeakInstance<T> {
@@ -198,10 +186,6 @@ impl<T: Target> Instance<T> {
 
     pub fn render(&mut self, eval: &mut EvalContext) {
         self.tree = self.opts.layout.render(eval);
-    }
-
-    pub fn update(&mut self, eval: &mut EvalContext) {
-        self.update_res = self.opts.layout.update(eval, self);
     }
 }
 

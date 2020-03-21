@@ -5,14 +5,14 @@ use web_sys::{HtmlElement, Node};
 use crate::component::Component;
 use crate::component::UpdateContext;
 use crate::{
-    instance::{InstanceOptions, InstanceRef},
+    instance::{InstanceRef, InstanceSpec},
     layout::Layout,
     scheduler::Scheduler,
 };
 
 use super::Html;
 
-pub fn node<P>(ctx: &UpdateContext<P, Html>) -> Option<Node> {
+pub fn node(ctx: &UpdateContext<Html>) -> Option<Node> {
     ctx.instance
         .runtime
         .as_ref()
@@ -27,7 +27,7 @@ pub fn render<C: Component<Target = Html>>(
     console_error_panic_hook::set_once();
 
     let scheduler = Scheduler::new();
-    let instance = InstanceRef::new(InstanceOptions {
+    let instance = InstanceRef::new(InstanceSpec {
         scheduler: scheduler.clone(),
         parent: None,
         layout: Arc::new(layout),
