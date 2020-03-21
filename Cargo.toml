@@ -2,6 +2,7 @@
 [workspace]
 members = [
     "packages/rustweb",
+    "packages/rustcss",
     "examples/simple",
 ]
 

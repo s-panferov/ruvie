@@ -13,6 +13,7 @@ edition = "2018"
 wasm-bindgen="*"
 console_error_panic_hook = "0.1.6"
 observe={path = "../../../observe"}
+rustcss={path = "../rustcss"}
 js-sys="*"
 web-sys={ version="*", features=[
   "console",

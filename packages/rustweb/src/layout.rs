@@ -1,10 +1,10 @@
 use observe::EvalContext;
 use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
+use std::{any::Any, sync::Arc};
 
 use crate::component::Target;
-use crate::component::{Component, Context, UpdateContext};
-use crate::{instance::Instance, Func};
+use crate::component::{Component, Context};
+use crate::Func;
 
 pub type Child<T> = Arc<dyn AnyLayout<T>>;
 
@@ -118,18 +118,6 @@ impl<C: Component> Layout<C> {
             props: &self.props,
         })
     }
-
-    fn call_update(
-        &self,
-        eval: &mut EvalContext,
-        instance: &Instance<C::Target>,
-    ) -> Result<(), <C::Target as Target>::Error> {
-        self.component.update(UpdateContext {
-            eval,
-            props: &self.props,
-            instance,
-        })
-    }
 }
 
 pub trait LayoutBuilder: Component + Sized {
@@ -172,13 +160,16 @@ impl<C: Component<Props = ()>> From<C> for Layout<C> {
 impl<C> LayoutBuilder for C where C: Component {}
 
 pub trait AnyLayout<T: Target> {
+    fn props(&self) -> &dyn Any;
     fn mount(&self, ctx: &mut T::MountContext, tree: Children<T>) -> Result<T::Result, T::Error>;
-
     fn render(&self, ev: &mut EvalContext) -> Children<T>;
-    fn update(&self, ev: &mut EvalContext, instance: &Instance<T>) -> Result<(), T::Error>;
 }
 
 impl<C: Component> AnyLayout<C::Target> for Layout<C> {
+    fn props(&self) -> &dyn Any {
+        &self.props as &dyn Any
+    }
+
     fn mount(
         &self,
         ctx: &mut <C::Target as Target>::MountContext,
@@ -189,13 +180,5 @@ impl<C: Component> AnyLayout<C::Target> for Layout<C> {
 
     fn render(&self, ev: &mut EvalContext) -> Children<C::Target> {
         self.call_render(ev)
-    }
-
-    fn update(
-        &self,
-        ev: &mut EvalContext,
-        instance: &Instance<C::Target>,
-    ) -> Result<(), <C::Target as Target>::Error> {
-        self.call_update(ev, instance)
     }
 }

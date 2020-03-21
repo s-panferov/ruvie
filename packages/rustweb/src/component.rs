@@ -13,17 +13,38 @@ pub struct Context<'a, P = (), T: Target = Html> {
     pub children: &'a Children<T>,
 }
 
-pub struct UpdateContext<'a, P = (), T: Target = Html> {
-    pub props: &'a P,
+pub struct UpdateContext<'a, T: Target> {
     pub eval: &'a mut EvalContext,
     pub(crate) instance: &'a Instance<T>,
 }
 
+impl<'a, T: Target> UpdateContext<'a, T> {
+    pub fn typed<C: Component<Target = T>>(self) -> UpdateContextTyped<'a, C> {
+        UpdateContextTyped {
+            props: self
+                .instance
+                .opts
+                .layout
+                .props()
+                .downcast_ref::<C::Props>()
+                .unwrap(),
+            eval: self.eval,
+            instance: self.instance,
+        }
+    }
+}
+
+pub struct UpdateContextTyped<'a, C: Component> {
+    pub props: &'a C::Props,
+    pub eval: &'a mut EvalContext,
+    pub(crate) instance: &'a Instance<C::Target>,
+}
+
 pub trait Target: Clone + 'static {
     type MountContext;
+    type Result;
     type Error;
     type Runtime;
-    type Result;
 
     fn component(
         ctx: &mut Self::MountContext,
@@ -52,13 +73,6 @@ pub trait Component: 'static {
         tree: Children<Self::Target>,
     ) -> Result<<Self::Target as Target>::Result, <Self::Target as Target>::Error> {
         Self::Target::component(ctx, tree)
-    }
-
-    fn update(
-        &self,
-        _ctx: UpdateContext<Self::Props, Self::Target>,
-    ) -> Result<(), <Self::Target as Target>::Error> {
-        Ok(())
     }
 }
 

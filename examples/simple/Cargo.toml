@@ -18,6 +18,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 console_error_panic_hook = "0.1.6"
 rustweb={path="../../packages/rustweb"}
+rustcss={path="../../packages/rustcss"}
 wasm-bindgen = "*"
 observe={path = "../../../observe"}
 maplit="*"

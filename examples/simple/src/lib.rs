@@ -4,14 +4,20 @@ use std::sync::Arc;
 
 use observe::transaction;
 use observe::EvalContext;
-use rustweb::dom::HtmlProps;
+use rustweb::dom::{el::HtmlProps, ClassList, DefaultAttributes};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 
 use observe::{Computed, Value, Var};
+
+use rustcss::{
+    color::{BasicColor, Color},
+    prelude::*,
+    Position, StyleSheet,
+};
 use rustweb::{
-    dom::{div, Html},
+    dom::{el::div, Html},
     prelude::*,
     Children, Context,
 };
@@ -37,7 +43,7 @@ fn Button(ctx: Context<()>) -> Children<Html> {
 #[observe::store]
 struct AppStore {
     props: AppProps,
-    style: Computed<String>,
+    style: Computed<Option<StyleSheet>>,
 }
 
 impl AppStore {
@@ -49,37 +55,44 @@ impl AppStore {
         })
     }
 
-    fn style(&self, ev: &mut EvalContext) -> String {
+    fn style(&self, ev: &mut EvalContext) -> Option<StyleSheet> {
         let AppProps { x, y, theme } = &self.props;
 
-        let mut style = "height: 100px; position: absolute; width: 100px;".to_owned();
+        let mut style = StyleSheet::new();
+
+        style
+            .height(100.px())
+            .width(200.px())
+            // .background_color(Rgba)
+            .position(Position::Absolute);
+
         if *theme.observe(ev) == Theme::Square {
-            style += "background-color: green;"
+            style.background_color(Color::from(BasicColor::Green));
         } else {
-            style += "background-color: red;"
+            style.background_color(Color::from(BasicColor::Red));
         }
 
-        style += &format!("left: {}px;", &x.observe(ev));
-        style += &format!("top: {}px;", &y.observe(ev));
-        style
+        style.left(x.observe(ev).px());
+        style.top(y.observe(ev).px());
+        Some(style)
     }
 }
 
 fn App(ctx: Context<Arc<AppStore>>) -> Children<Html> {
     let Context { props, .. } = ctx;
-
     let _ = props.props.theme.observe(ctx.eval);
 
     div()
         .with({
-            let style = props.style.clone();
             HtmlProps {
-                attributes: Computed::new(move |ctx| {
-                    maplit::btreemap! {
-                        "style".to_owned() => style.observe(ctx).to_string()
+                attributes: DefaultAttributes {
+                    style: props.style.clone().into(),
+                    class: ClassList {
+                        classes: vec!["test".to_owned()],
                     }
-                })
-                .into(),
+                    .into(),
+                    ..Default::default()
+                },
             }
         })
         .child("Test")
