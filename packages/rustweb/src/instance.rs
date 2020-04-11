@@ -4,8 +4,10 @@ use std::{
     sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
-use observe::EvalContext;
-use observe::{Tracker, WeakTracker};
+use observe::{
+    local::{EvalContext, Local},
+    Evaluation, Tracker, WeakTracker,
+};
 
 use crate::component::Target;
 use crate::layout::Child;
@@ -56,7 +58,7 @@ impl<T: Target> InstanceRef<T> {
     pub fn perform_render(&self) -> Result<T::Result, T::Error> {
         {
             let rx = self.get().render_rx.clone();
-            rx.get_mut().update();
+            rx.update();
         }
 
         self.get_mut().render_scheduled = false;
@@ -72,7 +74,7 @@ impl<T: Target> InstanceRef<T> {
         for rx in updated {
             let rx = rx.upgrade();
             if let Some(rx) = rx {
-                rx.get_mut().update();
+                rx.update();
                 let res = std::mem::replace(&mut self.get_mut().update_res, Ok(()));
                 if res.is_err() {
                     return res;
@@ -118,8 +120,8 @@ pub struct Instance<T: Target> {
     render_scheduled: bool,
     update_scheduled: bool,
     pub(crate) update_res: Result<(), T::Error>,
-    pub(crate) update_rx: Vec<Tracker>,
-    pub(crate) updated_rx: HashSet<WeakTracker>,
+    pub(crate) update_rx: Vec<Tracker<Local>>,
+    pub(crate) updated_rx: HashSet<WeakTracker<Local>>,
     pub(crate) runtime: Option<T::Runtime>,
 }
 
@@ -128,6 +130,40 @@ pub struct InstanceSpec<T: Target> {
     pub parent: Option<WeakInstance<T>>,
     pub layout: Child<T>,
     pub level: usize,
+}
+
+struct RenderEngine<T>
+where
+    T: Target,
+{
+    instance: WeakInstance<T>,
+}
+
+impl<T> Evaluation<Local> for RenderEngine<T>
+where
+    T: Target,
+{
+    fn evaluate(&mut self, ctx: &mut EvalContext) -> u64 {
+        if let Some(i) = self.instance.upgrade() {
+            i.get_mut().render(ctx);
+        } else {
+            unreachable!()
+        }
+        0
+    }
+
+    fn on_reaction(&mut self) {
+        if let Some(instance) = self.instance.upgrade() {
+            // FIXME triggers several times, need to optimize in observe
+            instance.schedule_render()
+        } else {
+            unreachable!()
+        }
+    }
+
+    fn is_scheduled(&self) -> bool {
+        true
+    }
 }
 
 impl<T: Target> Instance<T> {
@@ -148,32 +184,10 @@ impl<T: Target> Instance<T> {
     }
 
     pub fn init(&mut self) {
-        let mut render_rx = self.render_rx.get_mut();
-
-        render_rx.set_is_observer();
-        render_rx.set_computation({
-            let instance = self.weak_ref().clone();
-            move |eval: &mut EvalContext| {
-                if let Some(i) = instance.upgrade() {
-                    i.get_mut().render(eval);
-                } else {
-                    unreachable!()
-                }
-                0
-            }
-        });
-
-        render_rx.on_reaction({
-            let rt = self.weak_ref().clone();
-            move || {
-                if let Some(instance) = rt.upgrade() {
-                    // FIXME triggers several times, need to optimize in observe
-                    instance.schedule_render()
-                } else {
-                    unreachable!()
-                }
-            }
-        });
+        self.render_rx.set_computation(Box::new(RenderEngine {
+            instance: self.weak_ref().clone(),
+        }));
+        self.render_rx.autorun();
     }
 
     pub fn weak_ref(&self) -> &WeakInstance<T> {

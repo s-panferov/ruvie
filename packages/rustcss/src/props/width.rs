@@ -1,8 +1,9 @@
+use std::fmt::Display;
+
 use crate::global::Auto;
 use crate::length::Length;
 use crate::percentage::Percentage;
 use crate::rule::Rule;
-use std::fmt::Display;
 
 pub enum Width {
     Length(Length),

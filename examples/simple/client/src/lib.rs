@@ -1,21 +1,25 @@
 #![allow(non_snake_case)]
 
-use std::sync::Arc;
+mod api;
 
-use observe::transaction;
-use observe::EvalContext;
+use std::future::Future;
+use std::task::Poll;
+use std::{fmt::Display, hash::Hash, rc::Rc};
+
+use observe::{
+    local::{EvalContext, Value},
+    transaction, Computed, Var,
+};
+
 use rustweb::dom::{el::HtmlProps, ClassList, DefaultAttributes};
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
-use wasm_bindgen::JsValue;
-
-use observe::{Computed, Value, Var};
+use wasm_bindgen::{prelude::*, JsCast, JsValue};
 
 use rustcss::{
     color::{BasicColor, Color},
     prelude::*,
     Position, StyleSheet,
 };
+
 use rustweb::{
     dom::{el::div, Html},
     prelude::*,
@@ -40,18 +44,53 @@ fn Button(ctx: Context<()>) -> Children<Html> {
     div().default().children(children.clone()).into()
 }
 
+#[derive(Debug)]
+pub struct HashableError(anyhow::Error);
+
+impl Display for HashableError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl<E> From<E> for HashableError
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    fn from(e: E) -> Self {
+        HashableError(e.into())
+    }
+}
+
+impl Hash for HashableError {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        format!("{:#?}", self.0).hash(state);
+    }
+}
+
 #[observe::store]
 struct AppStore {
     props: AppProps,
-    style: Computed<Option<StyleSheet>>,
+
+    #[computed]
+    style: Value<Option<StyleSheet>>,
+
+    #[autorun(future = "wasm")]
+    data: Value<Poll<Result<api::TestResponse, HashableError>>>,
+}
+
+fn location() -> url::Url {
+    let location = web_sys::window().unwrap().location().href().expect("Href");
+    url::Url::parse(&location).unwrap()
 }
 
 impl AppStore {
-    #[observe::create]
-    fn new(props: AppProps) -> Arc<Self> {
-        Arc::new(AppStore {
+    #[observe::constructor]
+    fn new(props: AppProps) -> Rc<Self> {
+        Rc::new(AppStore {
             props,
-            style: Default::default(),
+            style: Value::uninit(),
+            data: Value::uninit(),
         })
     }
 
@@ -76,11 +115,25 @@ impl AppStore {
         style.top(y.observe(ev).px());
         Some(style)
     }
+
+    fn data(
+        &self,
+        _ev: &mut EvalContext,
+    ) -> impl Future<Output = Result<api::TestResponse, HashableError>> {
+        async {
+            let mut url = location();
+            url.set_path("/api/test");
+            let resp = reqwest::get(url).await?.json::<api::TestResponse>().await?;
+            Ok(resp)
+        }
+    }
 }
 
-fn App(ctx: Context<Arc<AppStore>>) -> Children<Html> {
+fn App(ctx: Context<Rc<AppStore>>) -> Children<Html> {
     let Context { props, .. } = ctx;
     let _ = props.props.theme.observe(ctx.eval);
+
+    let payload = props.data.clone();
 
     div()
         .with({
@@ -95,9 +148,16 @@ fn App(ctx: Context<Arc<AppStore>>) -> Children<Html> {
                 },
             }
         })
-        .child("Test")
-        .child(Button.create().default().child("Test"))
-        .scope(move |_| "Test")
+        .scope(move |_ctx| {
+            let payload = payload.clone();
+            Value::from(Computed::new(move |eval| match &*payload.observe(eval) {
+                Poll::Ready(_v) => format!("DATA: {:?}", _v),
+                Poll::Pending => String::from("Loading"),
+            }))
+        })
+        // .child("Test")
+        // .child(Button.create().default().child("Test"))
+        // .scope(move |_| "Test")
         .into()
 }
 
@@ -105,9 +165,9 @@ fn App(ctx: Context<Arc<AppStore>>) -> Children<Html> {
 pub fn run() -> Result<(), JsValue> {
     console_error_panic_hook::set_once();
 
-    let x = Var::new(0);
-    let y = Var::new(0);
-    let theme = Var::new(Theme::Square);
+    let x = Value::from(Var::new(0));
+    let y = Value::from(Var::new(0));
+    let theme = Value::from(Var::new(Theme::Square));
 
     let store = AppStore::new(AppProps {
         theme: theme.clone().into(),
@@ -123,8 +183,8 @@ pub fn run() -> Result<(), JsValue> {
 
     let mousemove = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
         transaction(None, |tx| {
-            x.set(event.x(), tx);
-            y.set(event.y(), tx);
+            x.set(tx, event.x());
+            y.set(tx, event.y());
         });
     }) as Box<dyn FnMut(_)>);
 
@@ -132,11 +192,11 @@ pub fn run() -> Result<(), JsValue> {
         transaction(None, |tx| {
             let current = theme.once();
             theme.set(
+                tx,
                 match *current {
                     Theme::Circle => Theme::Square,
                     Theme::Square => Theme::Circle,
                 },
-                tx,
             );
         });
     }) as Box<dyn FnMut(_)>);

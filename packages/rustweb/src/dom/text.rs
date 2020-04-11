@@ -1,4 +1,4 @@
-use observe::Value;
+use observe::local::Value;
 
 use wasm_bindgen::JsValue;
 use web_sys::Node;
@@ -20,7 +20,7 @@ impl Component for Text {
     type Target = Html;
 
     fn mount(&self, ctx: &mut MountContext, _children: Children<Html>) -> Result<Node, JsValue> {
-        let el = ctx.doc.create_text_node(" ");
+        let el = ctx.doc.create_text_node("EMPTY");
         ctx.add_node(&el);
         ctx.reaction(self, {
             let el = el.clone();
@@ -60,6 +60,17 @@ impl From<&str> for Layout<Text> {
             },
             children: None.into(),
         }
+    }
+}
+
+impl From<Value<String>> for Children<Html> {
+    fn from(value: Value<String>) -> Self {
+        Layout {
+            component: Text {},
+            props: TextProps { value },
+            children: None.into(),
+        }
+        .into()
     }
 }
 

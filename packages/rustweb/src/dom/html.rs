@@ -13,7 +13,7 @@ use crate::layout::Children;
 use crate::scheduler::{Scheduler, WeakScheduler};
 
 use super::utils;
-use observe::{EvalContext, Tracker};
+use observe::{local::EvalContext, Evaluation, Local, Tracker, WeakTracker};
 
 #[derive(Clone, Debug)]
 pub struct Html;
@@ -43,6 +43,50 @@ pub struct MountContext {
     pub(crate) reactions: Vec<Tracker>,
 }
 
+struct ReactionEngine<C, F>
+where
+    C: Component,
+    F: Fn(UpdateContextTyped<C>) -> Result<(), <C::Target as Target>::Error>,
+{
+    instance: WeakInstance<C::Target>,
+    rx: WeakTracker<Local>,
+    handler: F,
+}
+
+impl<C, F> Evaluation<Local> for ReactionEngine<C, F>
+where
+    C: Component,
+    F: Fn(UpdateContextTyped<C>) -> Result<(), <C::Target as Target>::Error>,
+{
+    fn is_scheduled(&self) -> bool {
+        true
+    }
+
+    fn evaluate(&mut self, eval: &mut EvalContext) -> u64 {
+        if let Some(inst) = self.instance.upgrade() {
+            let i = inst.get();
+            let ctx = UpdateContext { eval, instance: &i }.typed::<C>();
+            let res = (self.handler)(ctx);
+            std::mem::drop(i);
+            inst.get_mut().update_res = res;
+        } else {
+            unreachable!()
+        }
+        0
+    }
+
+    fn on_reaction(&mut self) {
+        if let Some(instance) = self.instance.upgrade() {
+            // FIXME move to instance
+            instance.get_mut().updated_rx.insert(self.rx.clone());
+            // FIXME triggers several times, need to optimize in observe
+            instance.schedule_update()
+        } else {
+            unreachable!()
+        }
+    }
+}
+
 impl MountContext {
     pub(crate) fn add_node(&mut self, node: &Node) {
         self.nodes.push(node.clone());
@@ -54,46 +98,16 @@ impl MountContext {
 
     pub(crate) fn reaction<F, C: Component<Target = Html>>(&mut self, _: &C, handler: F)
     where
-        F: Fn(UpdateContextTyped<C>) -> Result<(), JsValue>,
+        F: Fn(UpdateContextTyped<C>) -> Result<(), <C::Target as Target>::Error>,
         F: 'static,
     {
         let rx = Tracker::new("Update Reaction".to_owned());
-
-        let mut rx_mut = rx.get_mut();
-        let instance_1 = self.instance.weak();
-        let instance_2 = self.instance.weak();
-
-        rx_mut.set_is_observer();
-        rx_mut.on_reaction({
-            let rx = rx.weak();
-            move || {
-                if let Some(instance) = instance_1.upgrade() {
-                    // FIXME move to instance
-                    instance.get_mut().updated_rx.insert(rx.clone());
-                    // FIXME triggers several times, need to optimize in observe
-                    instance.schedule_update()
-                } else {
-                    unreachable!()
-                }
-            }
-        });
-
-        rx_mut.set_computation({
-            move |eval: &mut EvalContext| {
-                if let Some(inst) = instance_2.upgrade() {
-                    let i = inst.get();
-                    let ctx = UpdateContext { eval, instance: &i }.typed::<C>();
-                    let res = handler(ctx);
-                    std::mem::drop(i);
-                    inst.get_mut().update_res = res;
-                } else {
-                    unreachable!()
-                }
-                0
-            }
-        });
-
-        std::mem::drop(rx_mut);
+        rx.set_computation(Box::new(ReactionEngine {
+            handler,
+            instance: self.instance.weak(),
+            rx: rx.weak(),
+        }));
+        rx.autorun();
         self.reactions.push(rx)
     }
 }

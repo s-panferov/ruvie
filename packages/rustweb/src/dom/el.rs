@@ -1,9 +1,10 @@
 use wasm_bindgen::JsValue;
 use web_sys::Node;
 
-use super::{utils, Html, MountContext};
 use crate::component::Component;
 use crate::Children;
+
+use super::{utils, Html, MountContext};
 
 pub use super::{
     attr::{Attribute, DefaultAttributes},
@@ -25,7 +26,7 @@ pub struct HtmlProps {
 macro_rules! attr {
     ($el:expr, $x:expr, $eval:expr, $where:expr) => {
         let prop = &$where;
-        if prop.exists() {
+        if !prop.is_empty() {
             let value = prop.observe($eval);
             $el.set_attribute(
                 $x,

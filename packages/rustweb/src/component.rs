@@ -1,4 +1,4 @@
-use observe::EvalContext;
+use observe::local::EvalContext;
 
 use crate::dom::Html;
 use crate::instance::Instance;
