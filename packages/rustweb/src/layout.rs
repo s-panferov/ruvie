@@ -1,4 +1,4 @@
-use observe::EvalContext;
+use observe::local::EvalContext;
 use std::ops::{Deref, DerefMut};
 use std::{any::Any, sync::Arc};
 
@@ -73,10 +73,11 @@ pub struct Layout<C: Component> {
 }
 
 impl<C: Component> Layout<C> {
-    pub fn child<F: Into<Layout<I>>, I: Component<Target = C::Target> + 'static>(
-        mut self,
-        child: F,
-    ) -> Self {
+    pub fn child<F, CH>(mut self, child: F) -> Self
+    where
+        F: Into<Layout<CH>>,
+        CH: Component<Target = C::Target> + 'static,
+    {
         match self.children.as_mut() {
             Some(children) => children.push(Arc::new(child.into())),
             None => self.children = child.into().into(),
@@ -85,10 +86,11 @@ impl<C: Component> Layout<C> {
         self
     }
 
-    pub fn scope<F: Fn(Context<(), C::Target>) -> CH + 'static, CH: Into<Children<C::Target>>>(
-        mut self,
-        child: F,
-    ) -> Self {
+    pub fn scope<F, CH>(mut self, child: F) -> Self
+    where
+        F: Fn(Context<(), C::Target>) -> CH + 'static,
+        CH: Into<Children<C::Target>>,
+    {
         let instance = Func::new(move |ctx| child(ctx).into());
         match self.children.as_mut() {
             Some(children) => children.push(Arc::new(instance.default())),

@@ -1,6 +1,6 @@
 # You must change these to your own details.
 [package]
-name = "simple"
+name = "simple-client"
 description = "My super awesome Rust, WebAssembly, and Webpack project!"
 version = "0.1.0"
 authors = ["You <you@example.com>"]
@@ -17,17 +17,22 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 console_error_panic_hook = "0.1.6"
-rustweb={path="../../packages/rustweb"}
-rustcss={path="../../packages/rustcss"}
+rustweb={path="../../../packages/rustweb"}
+rustcss={path="../../../packages/rustcss"}
 wasm-bindgen = "*"
-observe={path = "../../../observe"}
+observe={path = "../../../../observe", features=["wasm-bindgen-futures-0"]}
 maplit="*"
+serde={version="*", features = ["derive"]}
+futures="0.3"
+reqwest={version="*", features = ["json"]}
+anyhow="*"
+url="*"
 
 # wee_alloc = { version = "0.4.2", optional = true }
 
 [dependencies.web-sys]
 version = "*"
-features = ["MouseEvent"]
+features = ["MouseEvent", "Location"]
 
 [dev-dependencies]
 # wasm-bindgen-test = "0.2.45"

@@ -1,12 +1,13 @@
-use observe::MaybeValue;
-use rustcss::StyleSheet;
 use std::fmt::Display;
+
+use observe::local::Value;
+use rustcss::StyleSheet;
 
 #[derive(Debug, Default)]
 pub struct DefaultAttributes {
-    pub style: MaybeValue<StyleSheet>,
-    pub class: MaybeValue<ClassList>,
-    pub contenteditable: MaybeValue<bool>,
+    pub style: Value<Option<StyleSheet>>,
+    pub class: Value<Option<ClassList>>,
+    pub contenteditable: Value<Option<bool>>,
 }
 
 pub trait Attribute {

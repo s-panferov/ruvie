@@ -3,7 +3,8 @@
 members = [
     "packages/rustweb",
     "packages/rustcss",
-    "examples/simple",
+    "examples/simple/client",
+    "examples/simple/server",
 ]
 
 # [profile.release]

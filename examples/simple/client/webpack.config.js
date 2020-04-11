@@ -7,24 +7,27 @@ const dist = path.resolve(__dirname, "dist");
 module.exports = {
   mode: "development",
   entry: {
-    index: "./js/index.js"
+    index: "./js/index.js",
   },
   output: {
     path: dist,
-    filename: "[name].js"
+    filename: "[name].js",
   },
   devServer: {
-    contentBase: dist
+    contentBase: dist,
+    proxy: {
+      "/api/*": "http://localhost:3000",
+    },
   },
   plugins: [
     new CopyPlugin([path.resolve(__dirname, "static")]),
 
     new WasmPackPlugin({
       crateDirectory: __dirname,
-      extraArgs: "--out-name index",
+      // extraArgs: "--out-name index",
       watchDirectories: [
-        path.resolve(__dirname, "..", "..", "packages/rustweb/src")
-      ]
-    })
-  ]
+        path.resolve(__dirname, "..", "..", "packages/rustweb/src"),
+      ],
+    }),
+  ],
 };

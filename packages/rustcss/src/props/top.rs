@@ -40,6 +40,6 @@ impl From<Auto> for Top {
 
 impl Rule for Top {
     fn name(&self) -> &str {
-        "Top"
+        "top"
     }
 }
