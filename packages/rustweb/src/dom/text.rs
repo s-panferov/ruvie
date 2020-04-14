@@ -7,7 +7,7 @@ use crate::component::Component;
 use crate::layout::Layout;
 use crate::Children;
 
-use super::{Html, MountContext};
+use super::{Html, Mount};
 
 pub struct TextProps {
     value: Value<String>,
@@ -19,7 +19,7 @@ impl Component for Text {
     type Props = TextProps;
     type Target = Html;
 
-    fn mount(&self, ctx: &mut MountContext, _children: Children<Html>) -> Result<Node, JsValue> {
+    fn mount(&self, ctx: &mut Mount, _children: Children<Html>) -> Result<Node, JsValue> {
         let el = ctx.doc.create_text_node("EMPTY");
         ctx.add_node(&el);
         ctx.reaction(self, {
