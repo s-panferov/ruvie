@@ -1,70 +1,10 @@
+use std::{any::Any, rc::Rc};
+
 use observe::local::EvalContext;
-use std::ops::{Deref, DerefMut};
-use std::{any::Any, sync::Arc};
 
-use crate::component::Target;
-use crate::component::{Component, Context};
-use crate::Func;
-
-pub type Child<T> = Arc<dyn AnyLayout<T>>;
-
-#[derive(Clone)]
-pub struct Children<T> {
-    children: Option<Vec<Child<T>>>,
-}
-
-impl<T> Children<T> {
-    pub fn take(&mut self) -> Children<T> {
-        self.children.take().into()
-    }
-
-    pub fn unwrap(self) -> Vec<Child<T>> {
-        self.children.unwrap()
-    }
-}
-
-impl<T> Deref for Children<T> {
-    type Target = Option<Vec<Child<T>>>;
-    fn deref(&self) -> &Self::Target {
-        &self.children
-    }
-}
-
-impl<T> DerefMut for Children<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.children
-    }
-}
-
-impl<T> From<Option<Vec<Child<T>>>> for Children<T> {
-    fn from(children: Option<Vec<Child<T>>>) -> Self {
-        Children { children }
-    }
-}
-
-impl<T> From<Vec<Child<T>>> for Children<T> {
-    fn from(children: Vec<Child<T>>) -> Self {
-        Children {
-            children: Some(children),
-        }
-    }
-}
-
-impl<T> From<Child<T>> for Children<T> {
-    fn from(children: Child<T>) -> Self {
-        Children {
-            children: Some(vec![children]),
-        }
-    }
-}
-
-impl<C: Component> From<Layout<C>> for Children<C::Target> {
-    fn from(children: Layout<C>) -> Self {
-        Children {
-            children: Some(vec![Arc::new(children)]),
-        }
-    }
-}
+use crate::component::{Component, Render};
+use crate::target::Target;
+use crate::{children::Children, Func};
 
 pub struct Layout<C: Component> {
     pub(crate) component: C,
@@ -79,7 +19,7 @@ impl<C: Component> Layout<C> {
         CH: Component<Target = C::Target> + 'static,
     {
         match self.children.as_mut() {
-            Some(children) => children.push(Arc::new(child.into())),
+            Some(children) => children.push(Rc::new(child.into())),
             None => self.children = child.into().into(),
         }
 
@@ -88,12 +28,12 @@ impl<C: Component> Layout<C> {
 
     pub fn scope<F, CH>(mut self, child: F) -> Self
     where
-        F: Fn(Context<(), C::Target>) -> CH + 'static,
+        F: Fn(Render<(), C::Target>) -> CH + 'static,
         CH: Into<Children<C::Target>>,
     {
         let instance = Func::new(move |ctx| child(ctx).into());
         match self.children.as_mut() {
-            Some(children) => children.push(Arc::new(instance.default())),
+            Some(children) => children.push(Rc::new(instance.default())),
             None => self.children = instance.default().into(),
         }
 
@@ -114,7 +54,7 @@ impl<C: Component> Layout<C> {
     }
 
     fn call_render(&self, eval: &mut EvalContext) -> Children<C::Target> {
-        self.component.render(Context {
+        self.component.render(Render {
             eval,
             children: &self.children,
             props: &self.props,
@@ -163,7 +103,7 @@ impl<C> LayoutBuilder for C where C: Component {}
 
 pub trait AnyLayout<T: Target> {
     fn props(&self) -> &dyn Any;
-    fn mount(&self, ctx: &mut T::MountContext, tree: Children<T>) -> Result<T::Result, T::Error>;
+    fn mount(&self, ctx: &mut T::Mount, tree: Children<T>) -> Result<T::Result, T::Error>;
     fn render(&self, ev: &mut EvalContext) -> Children<T>;
 }
 
@@ -174,7 +114,7 @@ impl<C: Component> AnyLayout<C::Target> for Layout<C> {
 
     fn mount(
         &self,
-        ctx: &mut <C::Target as Target>::MountContext,
+        ctx: &mut <C::Target as Target>::Mount,
         tree: Children<C::Target>,
     ) -> Result<<C::Target as Target>::Result, <C::Target as Target>::Error> {
         self.component.mount(ctx, tree)

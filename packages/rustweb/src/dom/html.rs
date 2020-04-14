@@ -5,12 +5,14 @@ use wasm_bindgen::{prelude::*, JsCast, JsValue};
 use web_sys::Document;
 use web_sys::Node;
 
-use crate::component::{Component, Target, UpdateContext, UpdateContextTyped};
+use crate::children::Children;
+use crate::component::Component;
 use crate::instance::Instance;
 use crate::instance::InstanceRef;
 use crate::instance::WeakInstance;
-use crate::layout::Children;
 use crate::scheduler::{Scheduler, WeakScheduler};
+use crate::target::Target;
+use crate::update::{Update, UpdateT};
 
 use super::utils;
 use observe::{local::EvalContext, Evaluation, Local, Tracker, WeakTracker};
@@ -33,7 +35,7 @@ impl Drop for Runtime {
     }
 }
 
-pub struct MountContext {
+pub struct Mount {
     pub doc: Document,
     instance: InstanceRef<Html>,
     pub(crate) scheduler: Scheduler<Html>,
@@ -46,7 +48,7 @@ pub struct MountContext {
 struct ReactionEngine<C, F>
 where
     C: Component,
-    F: Fn(UpdateContextTyped<C>) -> Result<(), <C::Target as Target>::Error>,
+    F: Fn(UpdateT<C>) -> Result<(), <C::Target as Target>::Error>,
 {
     instance: WeakInstance<C::Target>,
     rx: WeakTracker<Local>,
@@ -56,7 +58,7 @@ where
 impl<C, F> Evaluation<Local> for ReactionEngine<C, F>
 where
     C: Component,
-    F: Fn(UpdateContextTyped<C>) -> Result<(), <C::Target as Target>::Error>,
+    F: Fn(UpdateT<C>) -> Result<(), <C::Target as Target>::Error>,
 {
     fn is_scheduled(&self) -> bool {
         true
@@ -65,7 +67,7 @@ where
     fn evaluate(&mut self, eval: &mut EvalContext) -> u64 {
         if let Some(inst) = self.instance.upgrade() {
             let i = inst.get();
-            let ctx = UpdateContext { eval, instance: &i }.typed::<C>();
+            let ctx = Update { eval, instance: &i }.typed::<C>();
             let res = (self.handler)(ctx);
             std::mem::drop(i);
             inst.get_mut().update_res = res;
@@ -87,7 +89,7 @@ where
     }
 }
 
-impl MountContext {
+impl Mount {
     pub(crate) fn add_node(&mut self, node: &Node) {
         self.nodes.push(node.clone());
     }
@@ -98,7 +100,7 @@ impl MountContext {
 
     pub(crate) fn reaction<F, C: Component<Target = Html>>(&mut self, _: &C, handler: F)
     where
-        F: Fn(UpdateContextTyped<C>) -> Result<(), <C::Target as Target>::Error>,
+        F: Fn(UpdateT<C>) -> Result<(), <C::Target as Target>::Error>,
         F: 'static,
     {
         let rx = Tracker::new("Update Reaction".to_owned());
@@ -113,12 +115,12 @@ impl MountContext {
 }
 
 impl Target for Html {
-    type MountContext = MountContext;
+    type Mount = Mount;
     type Error = JsValue;
     type Runtime = Runtime;
     type Result = Node;
 
-    fn component(ctx: &mut MountContext, children: Children<Html>) -> Result<Node, JsValue> {
+    fn component(ctx: &mut Mount, children: Children<Html>) -> Result<Node, JsValue> {
         let fragment = ctx.doc.create_document_fragment();
 
         let comment = ctx.doc.create_comment("Component");
@@ -137,7 +139,7 @@ impl Target for Html {
     fn mount(instance: &mut Instance<Html>) -> Result<Self::Result, Self::Error> {
         let window = web_sys::window().expect("no global `window` exists");
         let document = window.document().expect("should have a document on window");
-        let mut ctx = MountContext {
+        let mut ctx = Mount {
             doc: document,
             instance: instance.strong_ref(),
             parent: Some(instance.weak_ref().clone()),
@@ -149,7 +151,7 @@ impl Target for Html {
 
         let el = instance.opts.layout.mount(&mut ctx, instance.tree.take())?;
 
-        let MountContext {
+        let Mount {
             children,
             nodes,
             reactions,

@@ -1,8 +1,8 @@
 use std::sync::{Arc, Weak};
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use crate::component::Target;
 use crate::instance::WeakInstance;
+use crate::target::Target;
 
 #[derive(Clone)]
 pub struct Scheduler<T: Target> {

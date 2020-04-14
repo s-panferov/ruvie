@@ -9,10 +9,9 @@ use observe::{
     Evaluation, Tracker, WeakTracker,
 };
 
-use crate::component::Target;
-use crate::layout::Child;
-use crate::layout::Children;
+use crate::children::{Child, Children};
 use crate::scheduler::Scheduler;
+use crate::target::Target;
 
 #[derive(Clone)]
 pub struct InstanceRef<T: Target> {
@@ -111,20 +110,6 @@ impl<T: Target> InstanceRef<T> {
     }
 }
 
-pub struct Instance<T: Target> {
-    pub(crate) opts: InstanceSpec<T>,
-    pub(crate) tree: Children<T>,
-    pub(crate) children: Vec<InstanceRef<T>>,
-    reference: Option<WeakInstance<T>>,
-    render_rx: Tracker,
-    render_scheduled: bool,
-    update_scheduled: bool,
-    pub(crate) update_res: Result<(), T::Error>,
-    pub(crate) update_rx: Vec<Tracker<Local>>,
-    pub(crate) updated_rx: HashSet<WeakTracker<Local>>,
-    pub(crate) runtime: Option<T::Runtime>,
-}
-
 pub struct InstanceSpec<T: Target> {
     pub scheduler: Scheduler<T>,
     pub parent: Option<WeakInstance<T>>,
@@ -164,6 +149,20 @@ where
     fn is_scheduled(&self) -> bool {
         true
     }
+}
+
+pub struct Instance<T: Target> {
+    pub(crate) opts: InstanceSpec<T>,
+    pub(crate) tree: Children<T>,
+    pub(crate) children: Vec<InstanceRef<T>>,
+    reference: Option<WeakInstance<T>>,
+    render_rx: Tracker,
+    render_scheduled: bool,
+    update_scheduled: bool,
+    pub(crate) update_res: Result<(), T::Error>,
+    pub(crate) update_rx: Vec<Tracker<Local>>,
+    pub(crate) updated_rx: HashSet<WeakTracker<Local>>,
+    pub(crate) runtime: Option<T::Runtime>,
 }
 
 impl<T: Target> Instance<T> {

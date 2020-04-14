@@ -1,9 +1,9 @@
-use std::sync::Arc;
+use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use web_sys::{HtmlElement, Node};
 
 use crate::component::Component;
-use crate::component::UpdateContext;
+use crate::update::Update;
 use crate::{
     instance::{InstanceRef, InstanceSpec},
     layout::Layout,
@@ -12,7 +12,7 @@ use crate::{
 
 use super::Html;
 
-pub fn node(ctx: &UpdateContext<Html>) -> Option<Node> {
+pub fn node(ctx: &Update<Html>) -> Option<Node> {
     ctx.instance
         .runtime
         .as_ref()
@@ -30,7 +30,7 @@ pub fn render<C: Component<Target = Html>>(
     let instance = InstanceRef::new(InstanceSpec {
         scheduler: scheduler.clone(),
         parent: None,
-        layout: Arc::new(layout),
+        layout: Rc::new(layout),
         level: 0,
     });
 

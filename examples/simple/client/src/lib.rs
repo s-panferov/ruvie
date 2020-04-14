@@ -23,7 +23,7 @@ use rustcss::{
 use rustweb::{
     dom::{el::div, Html},
     prelude::*,
-    Children, Context,
+    Children, Render,
 };
 
 #[derive(Hash, PartialEq, Debug)]
@@ -39,8 +39,8 @@ struct AppProps {
     y: Value<i32>,
 }
 
-fn Button(ctx: Context<()>) -> Children<Html> {
-    let Context { children, .. } = ctx;
+fn Button(ctx: Render<()>) -> Children<Html> {
+    let Render { children, .. } = ctx;
     div().default().children(children.clone()).into()
 }
 
@@ -129,8 +129,8 @@ impl AppStore {
     }
 }
 
-fn App(ctx: Context<Rc<AppStore>>) -> Children<Html> {
-    let Context { props, .. } = ctx;
+fn App(ctx: Render<Rc<AppStore>>) -> Children<Html> {
+    let Render { props, .. } = ctx;
     let _ = props.props.theme.observe(ctx.eval);
 
     let payload = props.data.clone();

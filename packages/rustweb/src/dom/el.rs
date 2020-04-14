@@ -4,7 +4,7 @@ use web_sys::Node;
 use crate::component::Component;
 use crate::Children;
 
-use super::{utils, Html, MountContext};
+use super::{utils, Html, Mount};
 
 pub use super::{
     attr::{Attribute, DefaultAttributes},
@@ -43,7 +43,7 @@ impl Component for Div {
     type Props = HtmlProps;
     type Target = Html;
 
-    fn mount(&self, ctx: &mut MountContext, children: Children<Html>) -> Result<Node, JsValue> {
+    fn mount(&self, ctx: &mut Mount, children: Children<Html>) -> Result<Node, JsValue> {
         let el = ctx.doc.create_element("div")?;
         ctx.add_node(&el);
         utils::mount_children(ctx, children, &el)?;

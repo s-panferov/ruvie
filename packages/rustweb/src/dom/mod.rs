@@ -1,5 +1,5 @@
 pub use attr::*;
-pub use html::{Html, MountContext};
+pub use html::{Html, Mount};
 pub use render::{node, render};
 
 mod attr;

@@ -1,12 +1,12 @@
 use crate::{instance::InstanceSpec, Children, InstanceRef};
 
-use super::{html::MountContext, Html};
+use super::{html::Mount, Html};
 
 use wasm_bindgen::JsValue;
 use web_sys::Node;
 
 pub fn mount_children(
-    ctx: &mut MountContext,
+    ctx: &mut Mount,
     children: Children<Html>,
     into: &Node,
 ) -> Result<(), JsValue> {
