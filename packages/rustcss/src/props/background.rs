@@ -1,23 +1,10 @@
 use crate::color::Color;
-use crate::rule::Rule;
-use std::fmt::Display;
+use crate::rule::{Attribute, ValueFor};
 
-pub struct BackgroundColor(Color);
+pub struct BackgroundColor;
 
-impl Rule for BackgroundColor {
-    fn name(&self) -> &str {
-        "background-color"
-    }
+impl Attribute for BackgroundColor {
+    const NAME: &'static str = "background-color";
 }
 
-impl From<Color> for BackgroundColor {
-    fn from(value: Color) -> BackgroundColor {
-        BackgroundColor(value)
-    }
-}
-
-impl Display for BackgroundColor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        self.0.fmt(f)
-    }
-}
+impl ValueFor<BackgroundColor> for Color {}

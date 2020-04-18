@@ -2,14 +2,11 @@ use wasm_bindgen::JsValue;
 use web_sys::Node;
 
 use crate::component::Component;
-use crate::Children;
+use crate::mount::Mount;
 
-use super::{utils, Html, Mount};
+use super::{utils, Html};
 
-pub use super::{
-    attr::{Attribute, DefaultAttributes},
-    text::*,
-};
+pub use super::{attr::DefaultAttributes, text::*};
 
 #[derive(Debug)]
 pub struct Div {}
@@ -43,16 +40,18 @@ impl Component for Div {
     type Props = HtmlProps;
     type Target = Html;
 
-    fn mount(&self, ctx: &mut Mount, children: Children<Html>) -> Result<Node, JsValue> {
+    fn mount(&self, ctx: &mut Mount<Html>) -> Result<Node, JsValue> {
         let el = ctx.doc.create_element("div")?;
+
         ctx.add_node(&el);
-        utils::mount_children(ctx, children, &el)?;
-        ctx.reaction(self, {
+        utils::mount_children(ctx, &el)?;
+        ctx.reactions.add(self, {
             let el = el.clone();
             move |ctx| {
                 let attrs = &ctx.props.attributes;
                 attr!(el, "class", ctx.eval, attrs.class);
                 attr!(el, "style", ctx.eval, attrs.style);
+                attr!(el, "contenteditable", ctx.eval, attrs.contenteditable);
                 Ok(())
             }
         });

@@ -1,7 +1,7 @@
+use std::marker::PhantomData;
+
 use crate::children::Children;
 use crate::{target::Target, Component, Layout, Render};
-
-use std::marker::PhantomData;
 
 pub trait FunctionalComponent<F: Fn(Render<P, T>) -> Children<T>, P, T: Target> {
     fn create(self) -> Func<F, P, T>;
@@ -45,6 +45,7 @@ where
 {
     type Props = P;
     type Target = T;
+
     fn render(&self, ctx: Render<P, T>) -> Children<T> {
         (self.func)(ctx)
     }
@@ -57,6 +58,7 @@ where
 {
     fn from(func: F) -> Self {
         Layout {
+            reference: None,
             component: Func::new(func),
             props: (),
             children: None.into(),

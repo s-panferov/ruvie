@@ -7,7 +7,7 @@ mod stylesheet;
 pub mod color;
 pub mod props;
 
-pub use crate::props::Position;
+pub use crate::props::PositionType;
 pub use crate::stylesheet::StyleSheet;
 
 pub mod prelude {

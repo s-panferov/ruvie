@@ -1,26 +1,14 @@
-use crate::{instance::InstanceSpec, Children, InstanceRef};
-
-use super::{html::Mount, Html};
-
 use wasm_bindgen::JsValue;
 use web_sys::Node;
 
-pub fn mount_children(
-    ctx: &mut Mount,
-    children: Children<Html>,
-    into: &Node,
-) -> Result<(), JsValue> {
+use super::{render, Html};
+use crate::mount::Mount;
+
+pub fn mount_children(ctx: &mut Mount<Html>, into: &Node) -> Result<(), JsValue> {
+    let children = ctx.tree.take();
     if children.is_some() {
-        for c in children.unwrap().into_iter() {
-            let instance = InstanceRef::new(InstanceSpec {
-                parent: ctx.parent.clone(),
-                scheduler: ctx.scheduler.clone(),
-                layout: c,
-                level: ctx.parent.as_ref().map(|p| p.level).unwrap_or(0) + 1,
-            });
-
-            let child_el = instance.perform_render()?;
-
+        for layout in children.unwrap().into_iter() {
+            let (child_el, instance) = render(layout, Some(ctx.instance.clone()))?;
             into.append_child(&child_el)?;
             ctx.add_child(instance);
         }
