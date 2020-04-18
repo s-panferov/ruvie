@@ -1,8 +1,10 @@
-use std::sync::{Arc, Weak};
+use std::cell::{Ref, RefCell, RefMut};
 use std::{
-    collections::HashSet,
-    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+    collections::{HashMap, HashSet},
+    rc::{Rc, Weak},
 };
+
+use snowflake::ProcessUniqueId;
 
 use observe::{
     local::{EvalContext, Local},
@@ -10,118 +12,166 @@ use observe::{
 };
 
 use crate::children::{Child, Children};
-use crate::scheduler::Scheduler;
-use crate::target::Target;
+use crate::runtime::Runtime;
+use crate::{after::AfterRender, mount::Reactions, target::Target, Component, ComponentRef};
 
-#[derive(Clone)]
-pub struct InstanceRef<T: Target> {
-    level: usize,
-    body: Arc<RwLock<Instance<T>>>,
+pub struct InstanceSpec<T: Target> {
+    pub runtime: Rc<Runtime<T>>,
+    pub parent: Option<Weak<Instance<T>>>,
+    pub layout: Child<T>,
+    pub level: usize,
 }
 
-impl<T: Target> InstanceRef<T> {
-    pub fn new(opts: InstanceSpec<T>) -> Self {
-        let level = opts.level;
-        let body = Instance::new(opts);
-        let runtime = InstanceRef {
-            level,
-            body: Arc::new(RwLock::new(body)),
-        };
+pub struct InstanceState<T: Target> {
+    pub(crate) rendered_tree: Children<T>,
+    pub(crate) children: Vec<Rc<Instance<T>>>,
+    render_rx: Tracker,
+    is_render_scheduled: bool,
+    is_update_scheduled: bool,
+    pub(crate) update_res: Result<(), T::Error>,
+    pub(crate) all_update_reactions: Vec<Tracker<Local>>,
+    pub(crate) invalidated_updates: HashSet<WeakTracker<Local>>,
+    pub(crate) runtime: Option<T::Runtime>,
+    pub(crate) references: HashMap<ProcessUniqueId, Weak<Instance<T>>>,
+}
 
-        let _re = runtime.weak();
+impl<T: Target> InstanceState<T> {
+    pub fn new() -> Self {
+        InstanceState {
+            children: vec![],
+            rendered_tree: None.into(),
+            render_rx: Tracker::new("Render".to_owned()),
+            all_update_reactions: vec![],
+            invalidated_updates: HashSet::new(),
+            update_res: Ok(()),
+            is_render_scheduled: false,
+            is_update_scheduled: false,
+            runtime: None,
+            references: HashMap::new(),
+        }
+    }
+}
+
+pub struct Instance<T: Target> {
+    pub(crate) spec: InstanceSpec<T>,
+    pub(crate) state: RefCell<InstanceState<T>>,
+}
+
+impl<T: Target> Instance<T> {
+    pub fn new(spec: InstanceSpec<T>) -> Rc<Self> {
+        let state = InstanceState::new();
+        let instance = Rc::new(Instance {
+            spec,
+            state: RefCell::new(state),
+        });
 
         {
-            let mut rt = runtime.get_mut();
-            rt.reference = Some(_re);
-            rt.init();
+            let self_ref = Rc::downgrade(&instance);
+            let state = instance.state_mut();
+            state
+                .render_rx
+                .set_computation(Box::new(RenderEngine { instance: self_ref }));
+            state.render_rx.autorun();
         }
 
-        runtime
+        instance
     }
 
-    pub fn weak(&self) -> WeakInstance<T> {
-        return WeakInstance {
-            level: self.level,
-            body: Arc::downgrade(&self.body),
-        };
+    pub(crate) fn state(&self) -> Ref<InstanceState<T>> {
+        self.state.borrow()
     }
 
-    pub fn get(&self) -> RwLockReadGuard<Instance<T>> {
-        self.body.read().unwrap()
+    pub(crate) fn state_mut(&self) -> RefMut<InstanceState<T>> {
+        self.state.borrow_mut()
     }
 
-    pub fn get_mut(&self) -> RwLockWriteGuard<Instance<T>> {
-        self.body.write().unwrap()
+    pub(crate) fn render(self: &Rc<Instance<T>>, eval: &mut EvalContext) {
+        self.state_mut().rendered_tree = self.spec.layout.render(self.clone(), eval);
     }
 
-    pub fn perform_render(&self) -> Result<T::Result, T::Error> {
+    pub(crate) fn perform_render(self: &Rc<Self>) -> Result<T::Result, T::Error> {
         {
-            let rx = self.get().render_rx.clone();
+            let rx = self.state().render_rx.clone();
             rx.update();
         }
 
-        self.get_mut().render_scheduled = false;
-        let res = T::mount(&mut self.get_mut());
+        self.state_mut().is_render_scheduled = false;
+        let res = T::mount(self.clone());
         self.perform_update()?;
         res
     }
 
-    pub fn perform_update(&self) -> Result<(), T::Error> {
+    pub(crate) fn register_reference(
+        self: &Rc<Self>,
+        id: ProcessUniqueId,
+        inst: Weak<Instance<T>>,
+    ) {
+        self.state_mut().references.insert(id, inst);
+    }
+
+    pub(crate) fn perform_update(&self) -> Result<(), T::Error> {
         // clone to release self-reference
-        let updated = self.get().updated_rx.clone();
+        let updated = self.state().invalidated_updates.clone();
 
         for rx in updated {
             let rx = rx.upgrade();
             if let Some(rx) = rx {
                 rx.update();
-                let res = std::mem::replace(&mut self.get_mut().update_res, Ok(()));
+                let res = std::mem::replace(&mut self.state_mut().update_res, Ok(()));
                 if res.is_err() {
                     return res;
                 }
             }
         }
 
-        self.get_mut().update_scheduled = false;
+        self.state_mut().is_update_scheduled = false;
         Ok(())
     }
 
-    pub fn schedule_render(&self) {
-        if self.get().render_scheduled {
+    pub(crate) fn schedule_render(self: &Rc<Self>) {
+        if self.state().is_render_scheduled {
             return;
         }
 
-        self.get_mut().render_scheduled = true;
-
-        // Clone here because scheduler may be syncronous
-        let scheduler = self.get().opts.scheduler.clone();
-        scheduler.schedule_render(self.weak());
+        self.state_mut().is_render_scheduled = true;
+        self.spec.runtime.schedule_render(Rc::downgrade(&self));
     }
 
-    pub fn schedule_update(&self) {
-        if self.get().update_scheduled {
+    pub(crate) fn schedule_update(self: &Rc<Self>) {
+        if self.state().is_update_scheduled {
             return;
         }
 
-        self.get_mut().update_scheduled = true;
-
-        // Clone here because scheduler may be syncronous
-        let scheduler = self.get().opts.scheduler.clone();
-        scheduler.schedule_update(self.weak());
+        self.state_mut().is_update_scheduled = true;
+        self.spec.runtime.schedule_update(Rc::downgrade(&self));
     }
-}
 
-pub struct InstanceSpec<T: Target> {
-    pub scheduler: Scheduler<T>,
-    pub parent: Option<WeakInstance<T>>,
-    pub layout: Child<T>,
-    pub level: usize,
+    pub(crate) fn after_render(self: &Rc<Self>) -> AfterRender<T> {
+        let mut ctx = AfterRender {
+            instance: self.clone(),
+            reactions: Reactions::new(Rc::downgrade(&self)),
+        };
+
+        self.spec.layout.after_render(&mut ctx);
+        ctx
+    }
+
+    pub(crate) fn before_unmount(&mut self) {
+        self.spec.layout.before_unmount()
+    }
+
+    pub(crate) fn get(&self, refr: &dyn AsRef<ProcessUniqueId>) -> Option<Rc<Instance<T>>> {
+        let state = self.state();
+        let res = state.references.get(&refr.as_ref());
+        res.and_then(|inst| inst.upgrade())
+    }
 }
 
 struct RenderEngine<T>
 where
     T: Target,
 {
-    instance: WeakInstance<T>,
+    instance: Weak<Instance<T>>,
 }
 
 impl<T> Evaluation<Local> for RenderEngine<T>
@@ -130,7 +180,7 @@ where
 {
     fn evaluate(&mut self, ctx: &mut EvalContext) -> u64 {
         if let Some(i) = self.instance.upgrade() {
-            i.get_mut().render(ctx);
+            i.render(ctx);
         } else {
             unreachable!()
         }
@@ -148,72 +198,5 @@ where
 
     fn is_scheduled(&self) -> bool {
         true
-    }
-}
-
-pub struct Instance<T: Target> {
-    pub(crate) opts: InstanceSpec<T>,
-    pub(crate) tree: Children<T>,
-    pub(crate) children: Vec<InstanceRef<T>>,
-    reference: Option<WeakInstance<T>>,
-    render_rx: Tracker,
-    render_scheduled: bool,
-    update_scheduled: bool,
-    pub(crate) update_res: Result<(), T::Error>,
-    pub(crate) update_rx: Vec<Tracker<Local>>,
-    pub(crate) updated_rx: HashSet<WeakTracker<Local>>,
-    pub(crate) runtime: Option<T::Runtime>,
-}
-
-impl<T: Target> Instance<T> {
-    pub fn new(opts: InstanceSpec<T>) -> Self {
-        Instance {
-            opts,
-            children: vec![],
-            tree: None.into(),
-            reference: None,
-            render_rx: Tracker::new("Render".to_owned()),
-            update_rx: vec![],
-            updated_rx: HashSet::new(),
-            update_res: Ok(()),
-            render_scheduled: false,
-            update_scheduled: false,
-            runtime: None,
-        }
-    }
-
-    pub fn init(&mut self) {
-        self.render_rx.set_computation(Box::new(RenderEngine {
-            instance: self.weak_ref().clone(),
-        }));
-        self.render_rx.autorun();
-    }
-
-    pub fn weak_ref(&self) -> &WeakInstance<T> {
-        self.reference.as_ref().unwrap()
-    }
-
-    pub fn strong_ref(&self) -> InstanceRef<T> {
-        self.weak_ref().upgrade().unwrap()
-    }
-
-    pub fn render(&mut self, eval: &mut EvalContext) {
-        self.tree = self.opts.layout.render(eval);
-    }
-}
-
-#[derive(Clone)]
-pub struct WeakInstance<T: Target> {
-    pub level: usize,
-    body: Weak<RwLock<Instance<T>>>,
-}
-
-impl<T: Target> WeakInstance<T> {
-    pub fn upgrade(&self) -> Option<InstanceRef<T>> {
-        let body = self.body.upgrade();
-        body.map(|body| InstanceRef {
-            level: self.level,
-            body,
-        })
     }
 }

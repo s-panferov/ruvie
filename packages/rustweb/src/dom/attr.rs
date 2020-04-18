@@ -10,10 +10,6 @@ pub struct DefaultAttributes {
     pub contenteditable: Value<Option<bool>>,
 }
 
-pub trait Attribute {
-    fn name(&self) -> &str;
-}
-
 #[derive(Debug, Hash)]
 pub struct ClassList {
     pub classes: Vec<String>,
@@ -22,14 +18,8 @@ pub struct ClassList {
 impl Display for ClassList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for cls in &self.classes {
-            write!(f, ".{}", cls)?
+            write!(f, "{}", cls)?
         }
         Ok(())
-    }
-}
-
-impl Attribute for ClassList {
-    fn name(&self) -> &str {
-        "class"
     }
 }

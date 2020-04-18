@@ -1,24 +1,24 @@
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
-use std::hash::Hasher;
+use std::{collections::BTreeMap, hash::Hasher};
 
 use web_sys::Element;
 
 use crate::{
-    props::{BackgroundColor, Height, Left, Position, Property, Top, Width},
-    rule::Rule,
+    props::{BackgroundColor, Height, Left, MinHeight, MinWidth, Position, Top, Width},
+    rule::{Attribute, ValueFor},
 };
 
 pub struct StyleSheet {
     name: Option<&'static str>,
-    rules: Vec<Property>,
+    rules: BTreeMap<&'static str, String>,
 }
 
 impl StyleSheet {
     pub fn new() -> StyleSheet {
         StyleSheet {
             name: None,
-            rules: Vec::new(),
+            rules: BTreeMap::new(),
         }
     }
 
@@ -36,34 +36,41 @@ impl StyleSheet {
         style
     }
 
-    pub fn width<T: Into<Width>>(&mut self, width: T) -> &mut Self {
-        self.rules.push(width.into().into());
+    pub fn add<A: Attribute, V: ValueFor<A>>(&mut self, value: V) -> &mut Self {
+        self.rules.insert(A::NAME, value.value());
         self
     }
 
-    pub fn position(&mut self, value: Position) -> &mut Self {
-        self.rules.push(value.into());
-        self
+    pub fn width<T: ValueFor<Width>>(&mut self, value: T) -> &mut Self {
+        self.add::<Width, T>(value)
     }
 
-    pub fn left<T: Into<Left>>(&mut self, left: T) -> &mut Self {
-        self.rules.push(left.into().into());
-        self
+    pub fn min_width<T: ValueFor<MinWidth>>(&mut self, value: T) -> &mut Self {
+        self.add::<MinWidth, T>(value)
     }
 
-    pub fn top<T: Into<Top>>(&mut self, top: T) -> &mut Self {
-        self.rules.push(top.into().into());
-        self
+    pub fn position<T: ValueFor<Position>>(&mut self, value: T) -> &mut Self {
+        self.add::<Position, T>(value)
     }
 
-    pub fn background_color<T: Into<BackgroundColor>>(&mut self, value: T) -> &mut Self {
-        self.rules.push(value.into().into());
-        self
+    pub fn left<T: ValueFor<Left>>(&mut self, value: T) -> &mut Self {
+        self.add::<Left, T>(value)
     }
 
-    pub fn height<T: Into<Height>>(&mut self, height: T) -> &mut Self {
-        self.rules.push(height.into().into());
-        self
+    pub fn top<T: ValueFor<Top>>(&mut self, value: T) -> &mut Self {
+        self.add::<Top, T>(value)
+    }
+
+    pub fn background_color<T: ValueFor<BackgroundColor>>(&mut self, value: T) -> &mut Self {
+        self.add::<BackgroundColor, T>(value)
+    }
+
+    pub fn height<T: ValueFor<Height>>(&mut self, value: T) -> &mut Self {
+        self.add::<Height, T>(value)
+    }
+
+    pub fn min_height<T: ValueFor<MinHeight>>(&mut self, value: T) -> &mut Self {
+        self.add::<MinHeight, T>(value)
     }
 }
 
@@ -75,8 +82,8 @@ impl Debug for StyleSheet {
 
 impl Display for StyleSheet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        for r in &self.rules {
-            write!(f, "{}: {};", r.name(), r)?
+        for (k, v) in &self.rules {
+            write!(f, "{}: {};", k, v)?
         }
 
         Ok(())

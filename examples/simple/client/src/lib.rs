@@ -1,23 +1,21 @@
 #![allow(non_snake_case)]
 
-mod api;
-
 use std::future::Future;
 use std::task::Poll;
 use std::{fmt::Display, hash::Hash, rc::Rc};
+
+use rustweb::dom::{el::HtmlProps, ClassList, DefaultAttributes};
+use wasm_bindgen::{prelude::*, JsCast, JsValue};
 
 use observe::{
     local::{EvalContext, Value},
     transaction, Computed, Var,
 };
 
-use rustweb::dom::{el::HtmlProps, ClassList, DefaultAttributes};
-use wasm_bindgen::{prelude::*, JsCast, JsValue};
-
 use rustcss::{
     color::{BasicColor, Color},
     prelude::*,
-    Position, StyleSheet,
+    PositionType, StyleSheet,
 };
 
 use rustweb::{
@@ -25,6 +23,8 @@ use rustweb::{
     prelude::*,
     Children, Render,
 };
+
+mod api;
 
 #[derive(Hash, PartialEq, Debug)]
 enum Theme {
@@ -103,7 +103,7 @@ impl AppStore {
             .height(100.px())
             .width(200.px())
             // .background_color(Rgba)
-            .position(Position::Absolute);
+            .position(PositionType::Absolute);
 
         if *theme.observe(ev) == Theme::Square {
             style.background_color(Color::from(BasicColor::Green));
@@ -136,7 +136,7 @@ fn App(ctx: Render<Rc<AppStore>>) -> Children<Html> {
     let payload = props.data.clone();
 
     div()
-        .with({
+        .with_props({
             HtmlProps {
                 attributes: DefaultAttributes {
                     style: props.style.clone().into(),
@@ -175,7 +175,7 @@ pub fn run() -> Result<(), JsValue> {
         y: y.clone().into(),
     });
 
-    let app = App.create().with(store);
+    let app = App.create().with_props(store);
 
     let window = web_sys::window().expect("no global `window` exists");
     let document = window.document().expect("should have a document on window");
@@ -207,7 +207,9 @@ pub fn run() -> Result<(), JsValue> {
     mousemove.forget();
     click.forget();
 
-    let instance = rustweb::dom::render(body, app)?;
+    let (node, instance) = rustweb::dom::render(Rc::new(app), None)?;
+    body.append_child(&node)?;
+
     Box::leak(Box::new(instance));
 
     Ok(())

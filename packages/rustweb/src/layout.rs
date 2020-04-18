@@ -3,16 +3,23 @@ use std::{any::Any, rc::Rc};
 use observe::local::EvalContext;
 
 use crate::component::{Component, Render};
+use crate::reference::{BoundComponentRef, BoundRef};
 use crate::target::Target;
-use crate::{children::Children, Func};
+use crate::{after::AfterRender, children::Children, mount::Mount, Func, Instance};
 
 pub struct Layout<C: Component> {
     pub(crate) component: C,
     pub(crate) props: C::Props,
     pub(crate) children: Children<C::Target>,
+    pub(crate) reference: Option<BoundComponentRef<C>>,
 }
 
 impl<C: Component> Layout<C> {
+    pub fn with_ref(mut self, refr: BoundComponentRef<C>) -> Self {
+        self.reference = Some(refr);
+        self
+    }
+
     pub fn child<F, CH>(mut self, child: F) -> Self
     where
         F: Into<Layout<CH>>,
@@ -52,35 +59,6 @@ impl<C: Component> Layout<C> {
 
         self
     }
-
-    fn call_render(&self, eval: &mut EvalContext) -> Children<C::Target> {
-        self.component.render(Render {
-            eval,
-            children: &self.children,
-            props: &self.props,
-        })
-    }
-}
-
-pub trait LayoutBuilder: Component + Sized {
-    fn with(self, props: Self::Props) -> Layout<Self> {
-        Layout {
-            component: self,
-            props,
-            children: None.into(),
-        }
-    }
-
-    fn default(self) -> Layout<Self>
-    where
-        Self::Props: Default,
-    {
-        Layout {
-            component: self,
-            props: Default::default(),
-            children: None.into(),
-        }
-    }
 }
 
 impl<C: Component> From<Layout<C>> for Box<dyn AnyLayout<C::Target>> {
@@ -94,33 +72,55 @@ impl<C: Component<Props = ()>> From<C> for Layout<C> {
         Layout {
             component,
             props: (),
+            reference: None,
             children: None.into(),
         }
     }
 }
 
-impl<C> LayoutBuilder for C where C: Component {}
-
 pub trait AnyLayout<T: Target> {
     fn props(&self) -> &dyn Any;
-    fn mount(&self, ctx: &mut T::Mount, tree: Children<T>) -> Result<T::Result, T::Error>;
-    fn render(&self, ev: &mut EvalContext) -> Children<T>;
+    fn mount(&self, ctx: &mut Mount<T>) -> Result<T::Result, T::Error>;
+    fn render(&self, instance: Rc<Instance<T>>, ev: &mut EvalContext) -> Children<T>;
+    fn after_render(&self, ctx: &mut AfterRender<T>);
+    fn before_unmount(&self);
+    fn get_ref(&self) -> Option<BoundRef<T>>;
 }
 
 impl<C: Component> AnyLayout<C::Target> for Layout<C> {
     fn props(&self) -> &dyn Any {
-        &self.props as &dyn Any
+        &self.props
     }
 
     fn mount(
         &self,
-        ctx: &mut <C::Target as Target>::Mount,
-        tree: Children<C::Target>,
+        ctx: &mut Mount<C::Target>,
     ) -> Result<<C::Target as Target>::Result, <C::Target as Target>::Error> {
-        self.component.mount(ctx, tree)
+        self.component.mount(ctx)
     }
 
-    fn render(&self, ev: &mut EvalContext) -> Children<C::Target> {
-        self.call_render(ev)
+    fn render(
+        &self,
+        instance: Rc<Instance<C::Target>>,
+        eval: &mut EvalContext,
+    ) -> Children<C::Target> {
+        self.component.render(Render {
+            eval,
+            children: &self.children,
+            props: &self.props,
+            instance,
+        })
+    }
+
+    fn after_render(&self, ctx: &mut AfterRender<C::Target>) {
+        self.component.after_render(ctx)
+    }
+
+    fn before_unmount(&self) {
+        self.component.before_unmount()
+    }
+
+    fn get_ref(&self) -> Option<BoundRef<C::Target>> {
+        self.reference.as_ref().map(|r| (*r).clone().into())
     }
 }

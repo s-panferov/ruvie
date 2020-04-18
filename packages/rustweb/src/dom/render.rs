@@ -1,41 +1,40 @@
 use std::rc::Rc;
 use wasm_bindgen::JsValue;
-use web_sys::{HtmlElement, Node};
+use web_sys::Node;
 
-use crate::component::Component;
-use crate::update::Update;
+use snowflake::ProcessUniqueId;
+
 use crate::{
-    instance::{InstanceRef, InstanceSpec},
-    layout::Layout,
-    scheduler::Scheduler,
+    instance::{Instance, InstanceSpec},
+    runtime::Runtime,
+    Child,
 };
 
 use super::Html;
 
-pub fn node(ctx: &Update<Html>) -> Option<Node> {
-    ctx.instance
-        .runtime
-        .as_ref()
-        .and_then(|r| r.nodes.get(0))
-        .map(|el| el.clone())
+pub fn node(ctx: &dyn AsRef<Instance<Html>>, r: &dyn AsRef<ProcessUniqueId>) -> Option<Node> {
+    ctx.as_ref().get(r).and_then(|inst| {
+        inst.state()
+            .runtime
+            .as_ref()
+            .and_then(|r| r.nodes.get(0))
+            .map(|el| el.clone())
+    })
 }
 
-pub fn render<C: Component<Target = Html>>(
-    el: HtmlElement,
-    layout: Layout<C>,
-) -> Result<InstanceRef<Html>, JsValue> {
-    console_error_panic_hook::set_once();
-
-    let scheduler = Scheduler::new();
-    let instance = InstanceRef::new(InstanceSpec {
-        scheduler: scheduler.clone(),
-        parent: None,
-        layout: Rc::new(layout),
-        level: 0,
+pub fn render(
+    layout: Child<Html>,
+    parent: Option<Rc<Instance<Html>>>,
+) -> Result<(Node, Rc<Instance<Html>>), JsValue> {
+    let instance = Instance::new(InstanceSpec {
+        runtime: parent
+            .as_ref()
+            .map(|parent| parent.spec.runtime.clone())
+            .unwrap_or_else(|| Runtime::new()),
+        level: parent.as_ref().map(|p| p.spec.level).unwrap_or(0) + 1,
+        parent: parent.map(|p| Rc::downgrade(&p)),
+        layout,
     });
-
     let res = instance.perform_render()?;
-    el.append_child(&res)?;
-
-    Ok(instance)
+    Ok((res, instance))
 }

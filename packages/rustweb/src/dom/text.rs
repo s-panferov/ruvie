@@ -1,13 +1,12 @@
 use observe::local::Value;
-
 use wasm_bindgen::JsValue;
 use web_sys::Node;
 
 use crate::component::Component;
 use crate::layout::Layout;
-use crate::Children;
+use crate::{mount::Mount, Children};
 
-use super::{Html, Mount};
+use super::Html;
 
 pub struct TextProps {
     value: Value<String>,
@@ -19,10 +18,10 @@ impl Component for Text {
     type Props = TextProps;
     type Target = Html;
 
-    fn mount(&self, ctx: &mut Mount, _children: Children<Html>) -> Result<Node, JsValue> {
+    fn mount(&self, ctx: &mut Mount<Html>) -> Result<Node, JsValue> {
         let el = ctx.doc.create_text_node("EMPTY");
         ctx.add_node(&el);
-        ctx.reaction(self, {
+        ctx.reactions.add(self, {
             let el = el.clone();
             move |ctx| {
                 let text = ctx.props.value.observe(ctx.eval);
@@ -42,6 +41,7 @@ impl Component for Text {
 impl From<String> for Layout<Text> {
     fn from(value: String) -> Self {
         Layout {
+            reference: None,
             component: Text {},
             props: TextProps {
                 value: value.into(),
@@ -54,6 +54,7 @@ impl From<String> for Layout<Text> {
 impl From<&str> for Layout<Text> {
     fn from(value: &str) -> Self {
         Layout {
+            reference: None,
             component: Text {},
             props: TextProps {
                 value: value.to_owned().into(),
@@ -66,6 +67,7 @@ impl From<&str> for Layout<Text> {
 impl From<Value<String>> for Children<Html> {
     fn from(value: Value<String>) -> Self {
         Layout {
+            reference: None,
             component: Text {},
             props: TextProps { value },
             children: None.into(),

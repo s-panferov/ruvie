@@ -1,22 +1,25 @@
-use crate::rule::Rule;
 use std::fmt::Display;
 
-pub enum Position {
+use crate::rule::{Attribute, ValueFor};
+
+pub struct Position;
+
+impl Attribute for Position {
+    const NAME: &'static str = "position";
+}
+
+pub enum PositionType {
     Absolute,
     Relative,
 }
 
-impl Rule for Position {
-    fn name(&self) -> &str {
-        "position"
-    }
-}
-
-impl Display for Position {
+impl Display for PositionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         match self {
-            Position::Absolute => f.write_str("absolute"),
-            Position::Relative => f.write_str("relative"),
+            PositionType::Absolute => f.write_str("absolute"),
+            PositionType::Relative => f.write_str("relative"),
         }
     }
 }
+
+impl ValueFor<Position> for PositionType {}
