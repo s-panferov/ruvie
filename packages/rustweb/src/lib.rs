@@ -20,6 +20,7 @@ pub mod prelude {
 pub use after::AfterRender;
 pub use children::{Child, Children};
 pub use component::{Component, Render, RenderSelf};
+pub use event::Event;
 pub use func::Func;
 pub use instance::Instance;
 pub use layout::{AnyLayout, Layout};
