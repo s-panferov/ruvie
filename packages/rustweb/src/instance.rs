@@ -13,7 +13,7 @@ use observe::{
 
 use crate::children::{Child, Children};
 use crate::runtime::Runtime;
-use crate::{after::AfterRender, mount::Reactions, target::Target, Component, ComponentRef};
+use crate::{after::AfterRender, mount::Reactions, target::Target};
 
 pub struct InstanceSpec<T: Target> {
     pub runtime: Rc<Runtime<T>>,

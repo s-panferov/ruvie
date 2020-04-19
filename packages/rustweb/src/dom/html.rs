@@ -4,6 +4,8 @@ use std::{iter::FromIterator, rc::Rc};
 use wasm_bindgen::{prelude::*, JsCast, JsValue};
 use web_sys::Node;
 
+use std::any::Any;
+
 use crate::instance::Instance;
 use crate::runtime::Runtime;
 use crate::{
@@ -19,6 +21,7 @@ pub struct Html;
 
 pub struct HtmlRuntime {
     pub nodes: Vec<Node>,
+    pub events: Vec<Closure<Box<dyn Any>>>,
 }
 
 impl Drop for HtmlRuntime {
@@ -68,6 +71,7 @@ impl Target for Html {
             platform: HtmlMount {
                 doc: document,
                 nodes: vec![],
+                events: vec![],
             },
         };
 
@@ -84,7 +88,10 @@ impl Target for Html {
 
         let mut state = instance.state_mut();
         if state.runtime.is_none() {
-            state.runtime = Some(HtmlRuntime { nodes })
+            state.runtime = Some(HtmlRuntime {
+                nodes,
+                events: vec![],
+            })
         } else {
             let rt = state.runtime.as_mut().unwrap();
             if rt.nodes.len() > 0 {
@@ -100,7 +107,10 @@ impl Target for Html {
                 let first = &rt.nodes[0];
                 first.parent_node().unwrap().replace_child(&el, &first)?;
             }
-            state.runtime = Some(HtmlRuntime { nodes })
+            state.runtime = Some(HtmlRuntime {
+                nodes,
+                events: vec![],
+            })
         }
 
         state.children = children;

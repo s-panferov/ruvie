@@ -4,6 +4,7 @@ pub use mount::HtmlMount;
 pub use render::{node, render};
 
 mod attr;
+mod event;
 mod html;
 mod mount;
 mod render;
