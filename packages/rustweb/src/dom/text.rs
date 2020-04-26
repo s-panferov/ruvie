@@ -2,11 +2,12 @@ use observe::local::Value;
 use wasm_bindgen::JsValue;
 use web_sys::Node;
 
-use crate::component::Component;
+use crate::component::{Component, ComponentExt};
 use crate::layout::Layout;
-use crate::{mount::Mount, Children};
+use crate::Children;
 
-use super::Html;
+use super::{Html, HtmlMount};
+use std::rc::Rc;
 
 pub struct TextProps {
     value: Value<String>,
@@ -18,17 +19,17 @@ impl Component for Text {
     type Props = TextProps;
     type Target = Html;
 
-    fn mount(&self, ctx: &mut Mount<Html>) -> Result<Node, JsValue> {
+    fn mount(&self, ctx: &mut HtmlMount) -> Result<Node, JsValue> {
         let el = ctx.doc.create_text_node("EMPTY");
         ctx.add_node(&el);
-        ctx.reactions.add(self, {
+        ctx.reaction(Self::reaction({
             let el = el.clone();
-            move |ctx| {
-                let text = ctx.props.value.observe(ctx.eval);
+            move |_, ctx| {
+                let text = Self::props(ctx).value.observe(&mut ctx.eval);
                 el.set_node_value(Some(&text));
                 Ok(())
             }
-        });
+        }));
 
         Ok(el.into())
     }
@@ -43,9 +44,9 @@ impl From<String> for Layout<Text> {
         Layout {
             reference: None,
             component: Text {},
-            props: TextProps {
+            props: Rc::new(TextProps {
                 value: value.into(),
-            },
+            }),
             children: None.into(),
         }
     }
@@ -56,9 +57,9 @@ impl From<&str> for Layout<Text> {
         Layout {
             reference: None,
             component: Text {},
-            props: TextProps {
+            props: Rc::new(TextProps {
                 value: value.to_owned().into(),
-            },
+            }),
             children: None.into(),
         }
     }
@@ -69,7 +70,7 @@ impl From<Value<String>> for Children<Html> {
         Layout {
             reference: None,
             component: Text {},
-            props: TextProps { value },
+            props: Rc::new(TextProps { value }),
             children: None.into(),
         }
         .into()

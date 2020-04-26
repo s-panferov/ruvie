@@ -1,10 +1,9 @@
 use wasm_bindgen::JsValue;
 use web_sys::Node;
 
-use super::{render, Html};
-use crate::mount::Mount;
+use super::{render, HtmlMount};
 
-pub fn mount_children(ctx: &mut Mount<Html>, into: &Node) -> Result<(), JsValue> {
+pub fn mount_children(ctx: &mut HtmlMount, into: &Node) -> Result<(), JsValue> {
     let children = ctx.tree.take();
     if children.is_some() {
         for layout in children.unwrap().into_iter() {

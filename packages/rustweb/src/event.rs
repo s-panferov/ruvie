@@ -1,14 +1,15 @@
-use observe::{Local, Timed, Value, Var};
-use std::{
-    fmt::Debug,
-    ops::{Deref, DerefMut},
-};
+use std::{fmt::Debug, rc::Rc};
 
-type EventValue<T> = Value<Option<Timed<T>>, Local>;
-
-#[derive(Clone)]
 pub struct Event<T> {
-    value: EventValue<T>,
+    handler: Rc<dyn Fn(T)>,
+}
+
+impl<T> Clone for Event<T> {
+    fn clone(&self) -> Self {
+        Event {
+            handler: self.handler.clone(),
+        }
+    }
 }
 
 impl<T> Debug for Event<T> {
@@ -17,41 +18,17 @@ impl<T> Debug for Event<T> {
     }
 }
 
-impl<T> Default for Event<T>
-where
-    T: 'static,
-{
-    fn default() -> Self {
-        Event::new()
-    }
-}
-
-impl<T> Deref for Event<T>
-where
-    T: 'static,
-{
-    type Target = EventValue<T>;
-    fn deref(&self) -> &Self::Target {
-        &self.value
-    }
-}
-
-impl<T> DerefMut for Event<T>
-where
-    T: 'static,
-{
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.value
-    }
-}
-
-impl<T> Event<T>
-where
-    T: 'static,
-{
-    pub fn new() -> Event<T> {
+impl<T> Event<T> {
+    pub fn new<F>(handler: F) -> Event<T>
+    where
+        F: Fn(T) + 'static,
+    {
         Event {
-            value: Value::from(Var::new(None)),
+            handler: Rc::new(handler),
         }
+    }
+
+    pub fn trigger(&self, ev: T) {
+        (self.handler)(ev)
     }
 }

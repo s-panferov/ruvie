@@ -1,42 +1,27 @@
-use observe::local::EvalContext;
-
 use crate::children::Children;
 use crate::{
-    after::AfterRender, dom::Html, instance::Instance, mount::Mount, target::Target, Layout,
+    builder::LayoutBuilder,
+    context::{AfterRender, Handler, Render, Update},
+    props::PropFor,
+    reference::BoundComponentRef,
+    target::Target,
+    ComponentRef, Event, Instance, Layout, Props,
 };
-use std::{ops::Deref, rc::Rc};
 
-pub type RenderSelf<'a, C> = Render<'a, <C as Component>::Props, <C as Component>::Target>;
+use std::{any::Any, hash::Hash, rc::Rc};
 
-pub struct Render<'a, P = (), T: Target = Html> {
-    pub props: &'a P,
-    pub eval: &'a mut EvalContext,
-    pub children: &'a Children<T>,
-    pub instance: Rc<Instance<T>>,
-}
-
-impl<'a, P, T: Target> Deref for Render<'a, P, T> {
-    type Target = Rc<Instance<T>>;
-    fn deref(&self) -> &Self::Target {
-        &self.instance
-    }
-}
-
-impl<'a, P, T: Target> AsRef<Rc<Instance<T>>> for Render<'a, P, T> {
-    fn as_ref(&self) -> &Rc<Instance<T>> {
-        &self.instance
-    }
-}
-
+/// Basic system trait all components should implement
 pub trait Component: 'static + Sized {
-    type Props;
+    type Props: Any;
     type Target: Target;
 
+    /// Defines component name. Useful for debugging.
     fn name(&self) -> &'static str {
         return "Component";
     }
 
-    fn render(&self, _ctx: Render<Self::Props, Self::Target>) -> Children<Self::Target> {
+    /// Main function that defines component layout
+    fn render(&self, _ctx: &mut Render<Self::Props, Self::Target>) -> Children<Self::Target> {
         _ctx.children.clone()
     }
 
@@ -46,29 +31,102 @@ pub trait Component: 'static + Sized {
 
     fn mount(
         &self,
-        ctx: &mut Mount<Self::Target>,
+        ctx: &mut <Self::Target as Target>::Mount,
     ) -> Result<<Self::Target as Target>::Result, <Self::Target as Target>::Error> {
         Self::Target::mount_component(ctx)
     }
+}
 
-    fn with_props(self, props: Self::Props) -> Layout<Self> {
-        Layout {
-            reference: None,
-            component: self,
-            props,
-            children: None.into(),
-        }
+pub trait ComponentExt: Component {
+    /// Get props from various available contexts
+    fn props(ctx: &Rc<Instance<Self::Target>>) -> Rc<Self::Props> {
+        ctx.spec
+            .layout
+            .props()
+            .downcast::<Self::Props>()
+            .expect("Type")
     }
 
-    fn default(self) -> Layout<Self>
+    /// Wrap a reference
+    fn reference<C: Component<Target = Self::Target>>(
+        instance: &Rc<Instance<Self::Target>>,
+        reference: &ComponentRef<C>,
+    ) -> BoundComponentRef<C> {
+        reference.bind(&instance)
+    }
+
+    /// Wrap a handler function to create an Event object that can
+    /// sent to another component as an event handler
+    fn handler<F, E>(instance: &Rc<Instance<Self::Target>>, handler: F) -> Event<E>
+    where
+        F: Fn(&Self, &mut Handler<E, Self::Target>) + 'static,
+        E: 'static,
+    {
+        let instance = Rc::downgrade(&instance);
+        let handler = Rc::new(handler);
+        Event::new(move |event| {
+            if let Some(instance) = instance.upgrade() {
+                let instance_1 = instance.clone();
+                let handler = handler.clone();
+                let component = instance
+                    .spec
+                    .layout
+                    .component()
+                    .downcast_ref::<Self>()
+                    .expect("Component");
+
+                handler(
+                    &component,
+                    &mut Handler {
+                        event,
+                        instance: instance_1,
+                    },
+                );
+            }
+        })
+    }
+
+    /// Wrap a reaction callback to be run in the context of the component
+    fn reaction<F, R>(
+        handler: F,
+    ) -> Box<dyn for<'a> Fn(&'a Instance<Self::Target>, &'a mut Update<'a, Self::Target>) -> R>
+    where
+        F: for<'a> Fn(&'a Self, &mut Update<'a, Self::Target>) -> R + 'static,
+    {
+        Box::new(move |instance, ctx| {
+            let component = instance
+                .spec
+                .layout
+                .component()
+                .downcast_ref::<Self>()
+                .expect("Type");
+            (handler)(component, ctx)
+        })
+    }
+
+    fn with_props(self, props: Rc<Self::Props>) -> LayoutBuilder<Self> {
+        LayoutBuilder::new(self, props)
+    }
+
+    fn prop<P: PropFor<Self> + Hash, V: Into<P::Value>>(
+        self,
+        prop: P,
+        value: V,
+    ) -> LayoutBuilder<Self>
+    where
+        Self: Component<Props = Props<Self>>,
+    {
+        let mut props = Props::new();
+        props.value_for(prop, value.into());
+        LayoutBuilder::new(self, Rc::new(props))
+    }
+
+    fn default(self) -> LayoutBuilder<Self>
     where
         Self::Props: Default,
     {
-        Layout {
-            reference: None,
-            component: self,
-            props: Default::default(),
-            children: None.into(),
-        }
+        LayoutBuilder::new(self, Default::default())
     }
 }
+
+impl<T> ComponentExt for T where T: Component {}

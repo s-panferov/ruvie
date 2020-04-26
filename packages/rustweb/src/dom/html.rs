@@ -1,30 +1,22 @@
-use std::collections::HashSet;
-use std::{iter::FromIterator, rc::Rc};
+use std::rc::Rc;
 
 use wasm_bindgen::{prelude::*, JsCast, JsValue};
 use web_sys::Node;
 
-use std::any::Any;
-
-use crate::instance::Instance;
 use crate::runtime::Runtime;
-use crate::{
-    mount::{Mount, Reactions},
-    target::Target,
-    AfterRender,
-};
+use crate::{context::Mount, target::Target};
 
-use super::{utils, HtmlMount};
+use super::{event::BoxedHandler, utils, HtmlMount};
 
 #[derive(Clone, Debug)]
 pub struct Html;
 
-pub struct HtmlRuntime {
+pub struct HtmlInstance {
     pub nodes: Vec<Node>,
-    pub events: Vec<Closure<Box<dyn Any>>>,
+    pub handlers: Vec<Box<dyn BoxedHandler>>,
 }
 
-impl Drop for HtmlRuntime {
+impl Drop for HtmlInstance {
     fn drop(&mut self) {
         for n in &self.nodes {
             let parent = n.parent_node();
@@ -38,10 +30,10 @@ impl Drop for HtmlRuntime {
 impl Target for Html {
     type Mount = HtmlMount;
     type Error = JsValue;
-    type Runtime = HtmlRuntime;
+    type Instance = HtmlInstance;
     type Result = Node;
 
-    fn mount_component(ctx: &mut Mount<Html>) -> Result<Node, JsValue> {
+    fn mount_component(ctx: &mut HtmlMount) -> Result<Node, JsValue> {
         let fragment = ctx.doc.create_document_fragment();
 
         let comment = ctx.doc.create_comment("Component");
@@ -57,43 +49,30 @@ impl Target for Html {
         Ok(fragment.into())
     }
 
-    fn mount(instance: Rc<Instance<Html>>) -> Result<Self::Result, Self::Error> {
+    fn mount(ctx: Mount<Html>) -> Result<(Self::Result, Mount<Html>), Self::Error> {
         let window = web_sys::window().expect("no global `window` exists");
         let document = window.document().expect("should have a document on window");
 
-        let tree = instance.state_mut().rendered_tree.take();
-        let layout = instance.spec.layout.clone();
-        let mut ctx = Mount {
-            children: vec![],
-            reactions: Reactions::new(Rc::downgrade(&instance)),
-            instance: instance.clone(),
-            tree,
-            platform: HtmlMount {
-                doc: document,
-                nodes: vec![],
-                events: vec![],
-            },
+        let layout = ctx.instance.spec.layout.clone();
+        let mut html = HtmlMount {
+            doc: document,
+            nodes: vec![],
+            handlers: vec![],
+            mount: ctx,
         };
 
-        let el = layout.mount(&mut ctx)?;
+        let el = layout.mount(&mut html)?;
 
-        let Mount {
-            children,
-            reactions,
-            platform,
-            ..
-        } = ctx;
+        let HtmlMount {
+            nodes, handlers, ..
+        } = html;
 
-        let HtmlMount { nodes, .. } = platform;
-
-        let mut state = instance.state_mut();
-        if state.runtime.is_none() {
-            state.runtime = Some(HtmlRuntime {
-                nodes,
-                events: vec![],
-            })
+        let mut state = html.mount.instance.state_mut();
+        let platform = &mut state.platform;
+        if platform.is_none() {
+            *platform = Some(HtmlInstance { nodes, handlers })
         } else {
-            let rt = state.runtime.as_mut().unwrap();
+            let rt = platform.as_mut().unwrap();
             if rt.nodes.len() > 0 {
                 // TODO do we need to remove nodes here if we re-create runtime anyway?
                 for (i, el) in rt.nodes.iter().enumerate() {
@@ -107,40 +86,13 @@ impl Target for Html {
                 let first = &rt.nodes[0];
                 first.parent_node().unwrap().replace_child(&el, &first)?;
             }
-            state.runtime = Some(HtmlRuntime {
-                nodes,
-                events: vec![],
-            })
+            *platform = Some(HtmlInstance { nodes, handlers })
         }
 
-        state.children = children;
-
-        let Reactions { reactions, .. } = reactions;
-
-        // mark all reactions as updated
-        state.invalidated_updates = HashSet::from_iter(reactions.iter().map(|c| c.weak()));
-        state.all_update_reactions = reactions;
+        std::mem::drop(platform);
         std::mem::drop(state);
 
-        if let Some(refr) = instance.spec.layout.get_ref() {
-            refr.apply(Rc::downgrade(&instance))
-        }
-
-        let ctx = instance.after_render();
-
-        let AfterRender { reactions, .. } = ctx;
-        let Reactions { reactions, .. } = reactions;
-
-        let mut state = instance.state_mut();
-
-        // mark all reactions as updated
-        state
-            .invalidated_updates
-            .extend(reactions.iter().map(|c| c.weak()));
-
-        state.all_update_reactions.extend(reactions);
-
-        Ok(el)
+        Ok((el, html.mount))
     }
 
     fn tick(scheduler: Rc<Runtime<Html>>) {

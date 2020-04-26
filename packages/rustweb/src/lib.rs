@@ -1,27 +1,28 @@
-mod after;
+mod builder;
 mod children;
 mod component;
+pub mod context;
 mod event;
 mod func;
 mod instance;
 mod layout;
-mod mount;
+mod props;
 mod reference;
 mod runtime;
 mod target;
-mod update;
 
 pub mod dom;
 pub mod prelude {
-    pub use crate::component::Component;
+    pub use crate::builder::*;
+    pub use crate::component::{Component, ComponentExt};
     pub use crate::func::FunctionalComponent;
 }
 
-pub use after::AfterRender;
-pub use children::{Child, Children};
-pub use component::{Component, Render, RenderSelf};
+pub use children::Children;
+pub use component::Component;
 pub use event::Event;
 pub use func::Func;
 pub use instance::Instance;
-pub use layout::{AnyLayout, Layout};
+pub use layout::{Child, Layout};
+pub use props::Props;
 pub use reference::ComponentRef;
