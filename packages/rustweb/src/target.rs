@@ -1,14 +1,13 @@
-use crate::{instance::Instance, mount::Mount, runtime::Runtime};
+use crate::{context::Mount, runtime::Runtime};
 use std::rc::Rc;
 
 pub trait Target: Clone + 'static {
     type Mount;
     type Result;
     type Error;
-    type Runtime;
+    type Instance;
 
-    fn mount_component(ctx: &mut Mount<Self>) -> Result<Self::Result, Self::Error>;
-
-    fn mount(mount: Rc<Instance<Self>>) -> Result<Self::Result, Self::Error>;
+    fn mount_component(ctx: &mut Self::Mount) -> Result<Self::Result, Self::Error>;
+    fn mount(ctx: Mount<Self>) -> Result<(Self::Result, Mount<Self>), Self::Error>;
     fn tick(scheduler: Rc<Runtime<Self>>);
 }

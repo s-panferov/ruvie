@@ -4,40 +4,48 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use snowflake::ProcessUniqueId;
-
 use observe::{
     local::{EvalContext, Local},
     Evaluation, Tracker, WeakTracker,
 };
+use snowflake::ProcessUniqueId;
 
-use crate::children::{Child, Children};
+use crate::children::Children;
 use crate::runtime::Runtime;
-use crate::{after::AfterRender, mount::Reactions, target::Target};
+use crate::{
+    context::{AfterRender, Mount, Update},
+    target::Target,
+    Child,
+};
 
-pub struct InstanceSpec<T: Target> {
+pub struct InstanceDef<T: Target> {
     pub runtime: Rc<Runtime<T>>,
     pub parent: Option<Weak<Instance<T>>>,
-    pub layout: Child<T>,
+    pub layout: Rc<dyn Child<T>>,
     pub level: usize,
 }
 
+pub struct Instance<T: Target> {
+    pub(crate) spec: InstanceDef<T>,
+    state: RefCell<InstanceState<T>>,
+}
+
 pub struct InstanceState<T: Target> {
-    pub(crate) rendered_tree: Children<T>,
-    pub(crate) children: Vec<Rc<Instance<T>>>,
+    rendered_tree: Children<T>,
+    children: Vec<Rc<Instance<T>>>,
     render_rx: Tracker,
     is_render_scheduled: bool,
     is_update_scheduled: bool,
-    pub(crate) update_res: Result<(), T::Error>,
-    pub(crate) all_update_reactions: Vec<Tracker<Local>>,
-    pub(crate) invalidated_updates: HashSet<WeakTracker<Local>>,
-    pub(crate) runtime: Option<T::Runtime>,
-    pub(crate) references: HashMap<ProcessUniqueId, Weak<Instance<T>>>,
+    update_res: Result<(), T::Error>,
+    all_update_reactions: Vec<Tracker<Local>>,
+    invalidated_updates: HashSet<WeakTracker<Local>>,
+    references: HashMap<ProcessUniqueId, Weak<Instance<T>>>,
+    pub(crate) platform: Option<T::Instance>,
 }
 
-impl<T: Target> InstanceState<T> {
-    pub fn new() -> Self {
-        InstanceState {
+impl<T: Target> Instance<T> {
+    pub fn new(spec: InstanceDef<T>) -> Rc<Self> {
+        let state = InstanceState {
             children: vec![],
             rendered_tree: None.into(),
             render_rx: Tracker::new("Render".to_owned()),
@@ -46,31 +54,20 @@ impl<T: Target> InstanceState<T> {
             update_res: Ok(()),
             is_render_scheduled: false,
             is_update_scheduled: false,
-            runtime: None,
+            platform: None,
             references: HashMap::new(),
-        }
-    }
-}
+        };
 
-pub struct Instance<T: Target> {
-    pub(crate) spec: InstanceSpec<T>,
-    pub(crate) state: RefCell<InstanceState<T>>,
-}
-
-impl<T: Target> Instance<T> {
-    pub fn new(spec: InstanceSpec<T>) -> Rc<Self> {
-        let state = InstanceState::new();
         let instance = Rc::new(Instance {
             spec,
             state: RefCell::new(state),
         });
 
         {
-            let self_ref = Rc::downgrade(&instance);
             let state = instance.state_mut();
-            state
-                .render_rx
-                .set_computation(Box::new(RenderEngine { instance: self_ref }));
+            state.render_rx.set_computation(Box::new(RenderReaction {
+                instance: Rc::downgrade(&instance),
+            }));
             state.render_rx.autorun();
         }
 
@@ -96,9 +93,48 @@ impl<T: Target> Instance<T> {
         }
 
         self.state_mut().is_render_scheduled = false;
-        let res = T::mount(self.clone());
+        let res = self.mount();
         self.perform_update()?;
         res
+    }
+
+    pub(crate) fn reaction(
+        self: &Rc<Self>,
+        handler: Box<dyn for<'a> Fn(&'a Self, &'a mut Update<'a, T>) -> Result<(), T::Error>>,
+    ) {
+        let rx = Tracker::new("Update Reaction".to_owned());
+        rx.set_computation(Box::new(UpdateReaction {
+            handler,
+            instance: Rc::downgrade(&self),
+            rx: rx.weak(),
+        }));
+
+        rx.autorun();
+
+        self.state_mut().invalidated_updates.insert(rx.weak());
+        self.state_mut().all_update_reactions.push(rx);
+    }
+
+    pub(crate) fn mount(self: &Rc<Self>) -> Result<T::Result, T::Error> {
+        let tree = self.state_mut().rendered_tree.take();
+        let ctx = Mount {
+            children: vec![],
+            instance: self.clone(),
+            tree,
+        };
+
+        let (res, ctx) = T::mount(ctx)?;
+        let Mount { children, .. } = ctx;
+
+        self.state_mut().children = children;
+
+        if let Some(refr) = self.spec.layout.get_ref() {
+            refr.apply(Rc::downgrade(&self))
+        }
+
+        self.after_render();
+
+        Ok(res)
     }
 
     pub(crate) fn register_reference(
@@ -146,35 +182,33 @@ impl<T: Target> Instance<T> {
         self.spec.runtime.schedule_update(Rc::downgrade(&self));
     }
 
-    pub(crate) fn after_render(self: &Rc<Self>) -> AfterRender<T> {
+    pub(crate) fn after_render(self: &Rc<Self>) {
         let mut ctx = AfterRender {
             instance: self.clone(),
-            reactions: Reactions::new(Rc::downgrade(&self)),
         };
 
         self.spec.layout.after_render(&mut ctx);
-        ctx
     }
 
     pub(crate) fn before_unmount(&mut self) {
         self.spec.layout.before_unmount()
     }
 
-    pub(crate) fn get(&self, refr: &dyn AsRef<ProcessUniqueId>) -> Option<Rc<Instance<T>>> {
+    pub(crate) fn get(&self, refr: &ProcessUniqueId) -> Option<Rc<Instance<T>>> {
         let state = self.state();
-        let res = state.references.get(&refr.as_ref());
+        let res = state.references.get(&refr);
         res.and_then(|inst| inst.upgrade())
     }
 }
 
-struct RenderEngine<T>
+struct RenderReaction<T>
 where
     T: Target,
 {
     instance: Weak<Instance<T>>,
 }
 
-impl<T> Evaluation<Local> for RenderEngine<T>
+impl<T> Evaluation<Local> for RenderReaction<T>
 where
     T: Target,
 {
@@ -198,5 +232,50 @@ where
 
     fn is_scheduled(&self) -> bool {
         true
+    }
+}
+
+pub struct UpdateReaction<T>
+where
+    T: Target,
+{
+    pub instance: Weak<Instance<T>>,
+    pub rx: WeakTracker<Local>,
+    pub handler:
+        Box<dyn for<'a> Fn(&'a Instance<T>, &'a mut Update<'a, T>) -> Result<(), T::Error>>,
+}
+
+impl<T> Evaluation<Local> for UpdateReaction<T>
+where
+    T: Target,
+{
+    fn is_scheduled(&self) -> bool {
+        true
+    }
+
+    fn evaluate(&mut self, eval: &mut EvalContext) -> u64 {
+        if let Some(instance) = self.instance.upgrade() {
+            let inst = instance.clone();
+            let mut ctx = Update { eval, instance };
+            let res = (self.handler)(&inst, &mut ctx);
+            inst.state_mut().update_res = res;
+        } else {
+            unreachable!()
+        }
+        0
+    }
+
+    fn on_reaction(&mut self) {
+        if let Some(instance) = self.instance.upgrade() {
+            // FIXME move to instance
+            instance
+                .state_mut()
+                .invalidated_updates
+                .insert(self.rx.clone());
+            // FIXME triggers several times, need to optimize in observe
+            instance.schedule_update()
+        } else {
+            unreachable!()
+        }
     }
 }

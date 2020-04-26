@@ -2,6 +2,7 @@ use crate::{target::Target, Component, Instance};
 use snowflake::ProcessUniqueId;
 use std::{
     marker::PhantomData,
+    ops::Deref,
     rc::{Rc, Weak},
 };
 
@@ -13,9 +14,12 @@ where
     _t: PhantomData<C>,
 }
 
-impl<C> AsRef<ProcessUniqueId> for ComponentRef<C> where
-C: Component {
-    fn as_ref(&self) -> &ProcessUniqueId {
+impl<C> Deref for ComponentRef<C>
+where
+    C: Component,
+{
+    type Target = ProcessUniqueId;
+    fn deref(&self) -> &ProcessUniqueId {
         &self.id
     }
 }
@@ -24,10 +28,10 @@ impl<C> ComponentRef<C>
 where
     C: Component,
 {
-    pub fn inside(&self, inst: &dyn AsRef<Rc<Instance<C::Target>>>) -> BoundComponentRef<C> {
+    pub fn bind(&self, inst: &Rc<Instance<C::Target>>) -> BoundComponentRef<C> {
         BoundComponentRef {
             id: self.id.clone(),
-            parent: Rc::downgrade(inst.as_ref()),
+            parent: Rc::downgrade(inst),
         }
     }
 }

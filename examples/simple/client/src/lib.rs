@@ -4,7 +4,6 @@ use std::future::Future;
 use std::task::Poll;
 use std::{fmt::Display, hash::Hash, rc::Rc};
 
-use rustweb::dom::{el::HtmlProps, ClassList, DefaultAttributes};
 use wasm_bindgen::{prelude::*, JsCast, JsValue};
 
 use observe::{
@@ -19,9 +18,10 @@ use rustcss::{
 };
 
 use rustweb::{
-    dom::{el::div, Html},
+    context::Render,
+    dom::{el::div, Class, ClassList, Html, Style},
     prelude::*,
-    Children, Render,
+    Children,
 };
 
 mod api;
@@ -39,9 +39,8 @@ struct AppProps {
     y: Value<i32>,
 }
 
-fn Button(ctx: Render<()>) -> Children<Html> {
-    let Render { children, .. } = ctx;
-    div().default().children(children.clone()).into()
+fn Button(ctx: &mut Render<()>) -> Children<Html> {
+    div().default().children(ctx.children.clone()).into()
 }
 
 #[derive(Debug)]
@@ -129,26 +128,16 @@ impl AppStore {
     }
 }
 
-fn App(ctx: Render<Rc<AppStore>>) -> Children<Html> {
-    let Render { props, .. } = ctx;
-    let _ = props.props.theme.observe(ctx.eval);
+fn App(ctx: &mut Render<AppStore>) -> Children<Html> {
+    let props = ctx.props;
+    let _ = props.props.theme.observe(&mut ctx.eval);
 
     let payload = props.data.clone();
 
     div()
-        .with_props({
-            HtmlProps {
-                attributes: DefaultAttributes {
-                    style: props.style.clone().into(),
-                    class: ClassList {
-                        classes: vec!["test".to_owned()],
-                    }
-                    .into(),
-                    ..Default::default()
-                },
-            }
-        })
-        .scope(move |_ctx| {
+        .prop(Style, props.style.clone())
+        .prop(Class, ClassList::new(vec!["test".to_owned()]))
+        .child(move |_ctx| {
             let payload = payload.clone();
             Value::from(Computed::new(move |eval| match &*payload.observe(eval) {
                 Poll::Ready(_v) => format!("DATA: {:?}", _v),
@@ -175,7 +164,7 @@ pub fn run() -> Result<(), JsValue> {
         y: y.clone().into(),
     });
 
-    let app = App.create().with_props(store);
+    let app = App.create().with_props(store).build();
 
     let window = web_sys::window().expect("no global `window` exists");
     let document = window.document().expect("should have a document on window");

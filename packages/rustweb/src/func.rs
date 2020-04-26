@@ -1,15 +1,15 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, rc::Rc};
 
 use crate::children::Children;
-use crate::{target::Target, Component, Layout, Render};
+use crate::{context::Render, target::Target, Component, Layout};
 
-pub trait FunctionalComponent<F: Fn(Render<P, T>) -> Children<T>, P, T: Target> {
+pub trait FunctionalComponent<F: Fn(&mut Render<P, T>) -> Children<T>, P, T: Target> {
     fn create(self) -> Func<F, P, T>;
 }
 
 impl<F, P, T: Target> FunctionalComponent<F, P, T> for F
 where
-    F: Fn(Render<P, T>) -> Children<T>,
+    F: Fn(&mut Render<P, T>) -> Children<T>,
 {
     fn create(self) -> Func<F, P, T> {
         Func {
@@ -20,13 +20,13 @@ where
     }
 }
 
-pub struct Func<F: Fn(Render<P, T>) -> Children<T>, P, T: Target> {
+pub struct Func<F: Fn(&mut Render<P, T>) -> Children<T>, P, T: Target> {
     func: F,
     p: PhantomData<P>,
     t: PhantomData<T>,
 }
 
-impl<F: Fn(Render<P, T>) -> Children<T>, P, T: Target> Func<F, P, T> {
+impl<F: Fn(&mut Render<P, T>) -> Children<T>, P, T: Target> Func<F, P, T> {
     pub fn new(func: F) -> Self {
         Func {
             func,
@@ -38,7 +38,7 @@ impl<F: Fn(Render<P, T>) -> Children<T>, P, T: Target> Func<F, P, T> {
 
 impl<F, P, T: Target> Component for Func<F, P, T>
 where
-    F: Fn(Render<P, T>) -> Children<T>,
+    F: Fn(&mut Render<P, T>) -> Children<T>,
     F: 'static,
     P: 'static,
     T: 'static,
@@ -46,21 +46,21 @@ where
     type Props = P;
     type Target = T;
 
-    fn render(&self, ctx: Render<P, T>) -> Children<T> {
+    fn render(&self, ctx: &mut Render<P, T>) -> Children<T> {
         (self.func)(ctx)
     }
 }
 
 impl<F, T: Target> From<F> for Layout<Func<F, (), T>>
 where
-    F: Fn(Render<(), T>) -> Children<T>,
+    F: Fn(&mut Render<(), T>) -> Children<T>,
     F: 'static,
 {
     fn from(func: F) -> Self {
         Layout {
             reference: None,
             component: Func::new(func),
-            props: (),
+            props: Rc::new(()),
             children: None.into(),
         }
     }
