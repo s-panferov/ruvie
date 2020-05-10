@@ -39,7 +39,7 @@ struct AppProps {
     y: Value<i32>,
 }
 
-fn Button(ctx: &mut Render<()>) -> Children<Html> {
+fn Button(ctx: &mut Render<(), Html>) -> Children<Html> {
     div().default().children(ctx.children.clone()).into()
 }
 
@@ -128,16 +128,16 @@ impl AppStore {
     }
 }
 
-fn App(ctx: &mut Render<AppStore>) -> Children<Html> {
-    let props = ctx.props;
-    let _ = props.props.theme.observe(&mut ctx.eval);
+fn App(ctx: &mut Render<AppStore, Html>) -> Children<Html> {
+    let store = ctx.props;
+    let _ = store.props.theme.observe(&mut ctx.eval);
 
-    let payload = props.data.clone();
+    let payload = store.data.clone();
 
     div()
-        .prop(Style, props.style.clone())
+        .prop(Style, store.style.clone())
         .prop(Class, ClassList::new(vec!["test".to_owned()]))
-        .child(move |_ctx| {
+        .scope(move |_ctx| {
             let payload = payload.clone();
             Value::from(Computed::new(move |eval| match &*payload.observe(eval) {
                 Poll::Ready(_v) => format!("DATA: {:?}", _v),
@@ -154,14 +154,14 @@ fn App(ctx: &mut Render<AppStore>) -> Children<Html> {
 pub fn run() -> Result<(), JsValue> {
     console_error_panic_hook::set_once();
 
-    let x = Value::from(Var::new(0));
-    let y = Value::from(Var::new(0));
+    let x: Value<_> = 0.into();
+    let y: Value<_> = 0.into();
     let theme = Value::from(Var::new(Theme::Square));
 
     let store = AppStore::new(AppProps {
-        theme: theme.clone().into(),
-        x: x.clone().into(),
-        y: y.clone().into(),
+        theme: theme.clone(),
+        x: x.clone(),
+        y: y.clone(),
     });
 
     let app = App.create().with_props(store).build();
@@ -196,7 +196,7 @@ pub fn run() -> Result<(), JsValue> {
     mousemove.forget();
     click.forget();
 
-    let (node, instance) = rustweb::dom::render(Rc::new(app), None)?;
+    let (node, instance) = rustweb::render(Rc::new(app), None)?;
     body.append_child(&node)?;
 
     Box::leak(Box::new(instance));

@@ -3,9 +3,9 @@ use std::{ops::Deref, rc::Rc};
 use observe::local::EvalContext;
 
 use crate::children::Children;
-use crate::{dom::Html, instance::Instance, target::Target};
+use crate::{instance::Instance, target::Target};
 
-pub struct Render<'a, P, T: Target = Html> {
+pub struct Render<'a, P, T: Target> {
     pub props: &'a Rc<P>,
     pub eval: &'a mut EvalContext,
     pub children: &'a Children<T>,

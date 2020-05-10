@@ -5,7 +5,7 @@ use crate::{
     props::PropFor,
     reference::BoundComponentRef,
     target::Target,
-    ComponentRef, Event, Instance, Layout, Props,
+    ComponentRef, Event, Instance, Props,
 };
 
 use std::{any::Any, hash::Hash, rc::Rc};
@@ -59,7 +59,7 @@ pub trait ComponentExt: Component {
     /// sent to another component as an event handler
     fn handler<F, E>(instance: &Rc<Instance<Self::Target>>, handler: F) -> Event<E>
     where
-        F: Fn(&Self, &mut Handler<E, Self::Target>) + 'static,
+        F: Fn(&Self, Handler<E, Self::Target>) + 'static,
         E: 'static,
     {
         let instance = Rc::downgrade(&instance);
@@ -77,7 +77,7 @@ pub trait ComponentExt: Component {
 
                 handler(
                     &component,
-                    &mut Handler {
+                    Handler {
                         event,
                         instance: instance_1,
                     },

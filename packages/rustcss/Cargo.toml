@@ -11,9 +11,13 @@ edition = "2018"
 
 [dependencies]
 downcast-rs= "1.1.1"
-web-sys={ version = "0.3.37", features = [
+web-sys={ version = "0.3.39", optional=true, features = [
   "StyleSheet",
   "Document",
   "Text",
   "Element"
 ] }
+
+[features]
+default=[]
+dom=["web-sys"]

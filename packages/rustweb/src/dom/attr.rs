@@ -4,7 +4,7 @@ use crate::{event::Event, props::Prop};
 
 use observe::local::Value;
 use rustcss::StyleSheet;
-use web_sys::MouseEvent;
+use web_sys::{InputEvent, MouseEvent};
 
 #[derive(Default, Debug)]
 pub struct HtmlProps {
@@ -12,6 +12,7 @@ pub struct HtmlProps {
     pub class: Value<Option<ClassList>>,
     pub contenteditable: Value<Option<bool>>,
     pub on_click: Option<Event<MouseEvent>>,
+    pub on_before_input: Option<Event<InputEvent>>,
 }
 
 #[derive(Hash)]
@@ -28,6 +29,13 @@ pub struct OnClick {
 
 impl Prop for OnClick {
     type Value = Event<MouseEvent>;
+}
+
+#[derive(Hash)]
+pub struct OnBeforeInput;
+
+impl Prop for OnBeforeInput {
+    type Value = Event<InputEvent>;
 }
 
 #[derive(Hash)]
