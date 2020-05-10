@@ -1,7 +1,9 @@
+use snowflake::ProcessUniqueId;
 use wasm_bindgen::JsValue;
 use web_sys::Node;
 
-use super::{render, HtmlMount};
+use super::{Html, HtmlMount};
+use crate::{instance::Instance, render};
 
 pub fn mount_children(ctx: &mut HtmlMount, into: &Node) -> Result<(), JsValue> {
     let children = ctx.tree.take();
@@ -14,4 +16,14 @@ pub fn mount_children(ctx: &mut HtmlMount, into: &Node) -> Result<(), JsValue> {
     }
 
     Ok(())
+}
+
+pub fn node(ctx: &Instance<Html>, r: &ProcessUniqueId) -> Option<Node> {
+    ctx.get(r).and_then(|inst| {
+        inst.state_mut()
+            .platform
+            .as_ref()
+            .and_then(|r| r.nodes.get(0))
+            .map(|el| el.clone())
+    })
 }

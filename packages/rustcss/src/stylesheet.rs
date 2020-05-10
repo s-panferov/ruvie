@@ -2,8 +2,6 @@ use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::{collections::BTreeMap, hash::Hasher};
 
-use web_sys::Element;
-
 use crate::{
     props::{BackgroundColor, Height, Left, MinHeight, MinWidth, Position, Top, Width},
     rule::{Attribute, ValueFor},
@@ -27,14 +25,14 @@ impl StyleSheet {
         self
     }
 
-    pub fn create_style(&self) -> Element {
-        let window = web_sys::window().expect("Window");
-        let document = window.document().expect("Document");
-        let style = document.create_element("style").expect("Style");
-        let text = document.create_text_node(&self.to_string());
-        style.append_child(&text).unwrap();
-        style
-    }
+    // pub fn create_style(&self) -> Element {
+    //     let window = web_sys::window().expect("Window");
+    //     let document = window.document().expect("Document");
+    //     let style = document.create_element("style").expect("Style");
+    //     let text = document.create_text_node(&self.to_string());
+    //     style.append_child(&text).unwrap();
+    //     style
+    // }
 
     pub fn add<A: Attribute, V: ValueFor<A>>(&mut self, value: V) -> &mut Self {
         self.rules.insert(A::NAME, value.value());

@@ -2,13 +2,13 @@ use std::{any::Any, rc::Rc};
 
 use observe::local::EvalContext;
 
-use crate::component::{Component, ComponentExt};
+use crate::component::Component;
 use crate::reference::{BoundComponentRef, BoundRef};
 use crate::target::Target;
 use crate::{
     children::Children,
     context::{AfterRender, Render},
-    Func, Instance,
+    Instance,
 };
 
 pub struct Layout<C: Component> {
@@ -40,6 +40,7 @@ impl<C: Component<Props = ()>> From<C> for Layout<C> {
 pub trait Child<T: Target> {
     fn props(&self) -> Rc<dyn Any>;
     fn component(&self) -> &dyn Any;
+    fn name(&self) -> &'static str;
 
     fn mount(&self, ctx: &mut T::Mount) -> Result<T::Result, T::Error>;
     fn render(&self, instance: Rc<Instance<T>>, ev: &mut EvalContext) -> Children<T>;
@@ -56,6 +57,10 @@ impl<C: Component> Child<C::Target> for Layout<C> {
 
     fn component(&self) -> &dyn Any {
         &self.component
+    }
+
+    fn name(&self) -> &'static str {
+        self.component.name()
     }
 
     fn mount(

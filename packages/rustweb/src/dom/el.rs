@@ -9,7 +9,8 @@ use crate::{
 };
 
 pub use super::{
-    event::bind, text::*, Class, ContentEditable, HtmlMount, HtmlProps, OnClick, Style,
+    event::bind, text::*, Class, ContentEditable, HtmlMount, HtmlProps, OnBeforeInput, OnClick,
+    Style,
 };
 
 macro_rules! attr {
@@ -37,8 +38,9 @@ pub fn div() -> Div {
 
 impl PropFor<Div> for Style {}
 impl PropFor<Div> for Class {}
-impl PropFor<Div> for OnClick {}
 impl PropFor<Div> for ContentEditable {}
+impl PropFor<Div> for OnClick {}
+impl PropFor<Div> for OnBeforeInput {}
 
 impl Component for Div {
     type Props = Props<Self>;
@@ -50,8 +52,10 @@ impl Component for Div {
 
         let props = Self::props(ctx);
         for prop in &props.props {
-            if let Some((_, v)) = prop.downcast::<OnClick>() {
-                ctx.add_handler(Box::new(bind(v, &el, "click")?));
+            if let Some((_, ev)) = prop.downcast::<OnClick>() {
+                ctx.add_handler(Box::new(bind(ev, &el, "click")?));
+            } else if let Some((_, ev)) = prop.downcast::<OnBeforeInput>() {
+                ctx.add_handler(Box::new(bind(ev, &el, "beforeinput")?));
             }
         }
 
@@ -63,11 +67,9 @@ impl Component for Div {
                 for prop in &props.props {
                     if let Some((_, style)) = prop.downcast::<Style>() {
                         attr!(el, "style", &mut ctx.eval, style);
-                    }
-                    if let Some((_, class)) = prop.downcast::<Class>() {
+                    } else if let Some((_, class)) = prop.downcast::<Class>() {
                         attr!(el, "class", &mut ctx.eval, class);
-                    }
-                    if let Some((_, contenteditable)) = prop.downcast::<ContentEditable>() {
+                    } else if let Some((_, contenteditable)) = prop.downcast::<ContentEditable>() {
                         attr!(el, "contenteditable", &mut ctx.eval, contenteditable);
                     }
                 }

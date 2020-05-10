@@ -36,13 +36,15 @@ impl Target for Html {
     fn mount_component(ctx: &mut HtmlMount) -> Result<Node, JsValue> {
         let fragment = ctx.doc.create_document_fragment();
 
-        let comment = ctx.doc.create_comment("Component");
+        let name = ctx.instance.spec.layout.name();
+
+        let comment = ctx.doc.create_comment(name);
         fragment.append_child(&comment)?;
         ctx.add_node(&comment);
 
         utils::mount_children(ctx, &fragment)?;
 
-        let comment = ctx.doc.create_comment("/Component");
+        let comment = ctx.doc.create_comment(&format!("/{}", name));
         ctx.add_node(&comment);
         fragment.append_child(&comment)?;
 
