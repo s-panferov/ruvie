@@ -3,7 +3,7 @@ use std::{any::Any, rc::Rc};
 use observe::local::EvalContext;
 
 use crate::component::Component;
-use crate::reference::{BoundComponentRef, BoundRef};
+use crate::reference::BoundRef;
 use crate::target::Target;
 use crate::{
     children::Children,
@@ -11,22 +11,33 @@ use crate::{
     Instance,
 };
 
-pub struct Layout<C: Component> {
+pub struct Layout<C: Component<T>, T>
+where
+    T: Target,
+{
     pub(crate) component: C,
     pub(crate) props: Rc<C::Props>,
-    pub(crate) children: Children<C::Target>,
-    pub(crate) reference: Option<BoundComponentRef<C>>,
+    pub(crate) children: Children<T>,
+    pub(crate) reference: Option<BoundRef<T>>,
 }
 
-impl<C: Component> Layout<C> {}
+impl<C: Component<T>, T> Layout<C, T> where T: Target {}
 
-impl<C: Component> From<Layout<C>> for Box<dyn Child<C::Target>> {
-    fn from(value: Layout<C>) -> Self {
+impl<C, T> From<Layout<C, T>> for Box<dyn Child<T>>
+where
+    C: Component<T>,
+    T: Target,
+{
+    fn from(value: Layout<C, T>) -> Self {
         Box::new(value)
     }
 }
 
-impl<C: Component<Props = ()>> From<C> for Layout<C> {
+impl<C, T> From<C> for Layout<C, T>
+where
+    C: Component<T, Props = ()>,
+    T: Target,
+{
     fn from(component: C) -> Self {
         Layout {
             component,
@@ -37,12 +48,14 @@ impl<C: Component<Props = ()>> From<C> for Layout<C> {
     }
 }
 
+/// This is basically a layout with an erased component type
 pub trait Child<T: Target> {
     fn props(&self) -> Rc<dyn Any>;
     fn component(&self) -> &dyn Any;
     fn name(&self) -> &'static str;
 
     fn mount(&self, ctx: &mut T::Mount) -> Result<T::Result, T::Error>;
+    fn should_render(&self) -> bool;
     fn render(&self, instance: Rc<Instance<T>>, ev: &mut EvalContext) -> Children<T>;
     fn after_render(&self, ctx: &mut AfterRender<T>);
     fn before_unmount(&self);
@@ -50,7 +63,11 @@ pub trait Child<T: Target> {
     fn inject(&self, func: Box<dyn FnOnce(&dyn Any, &dyn Any)>);
 }
 
-impl<C: Component> Child<C::Target> for Layout<C> {
+impl<C, T> Child<T> for Layout<C, T>
+where
+    C: Component<T>,
+    T: Target,
+{
     fn props(&self) -> Rc<dyn Any> {
         self.props.clone()
     }
@@ -63,18 +80,15 @@ impl<C: Component> Child<C::Target> for Layout<C> {
         self.component.name()
     }
 
-    fn mount(
-        &self,
-        ctx: &mut <C::Target as Target>::Mount,
-    ) -> Result<<C::Target as Target>::Result, <C::Target as Target>::Error> {
+    fn mount(&self, ctx: &mut T::Mount) -> Result<T::Result, T::Error> {
         self.component.mount(ctx)
     }
 
-    fn render(
-        &self,
-        instance: Rc<Instance<C::Target>>,
-        eval: &mut EvalContext,
-    ) -> Children<C::Target> {
+    fn should_render(&self) -> bool {
+        self.component.should_render(&self.props)
+    }
+
+    fn render(&self, instance: Rc<Instance<T>>, eval: &mut EvalContext) -> Children<T> {
         self.component.render(&mut Render {
             eval,
             children: &self.children,
@@ -83,7 +97,7 @@ impl<C: Component> Child<C::Target> for Layout<C> {
         })
     }
 
-    fn after_render(&self, ctx: &mut AfterRender<C::Target>) {
+    fn after_render(&self, ctx: &mut AfterRender<T>) {
         self.component.after_render(ctx)
     }
 
@@ -91,7 +105,7 @@ impl<C: Component> Child<C::Target> for Layout<C> {
         self.component.before_unmount()
     }
 
-    fn get_ref(&self) -> Option<BoundRef<C::Target>> {
+    fn get_ref(&self) -> Option<BoundRef<T>> {
         self.reference.as_ref().map(|r| (*r).clone().into())
     }
 

@@ -1,137 +1,29 @@
 #![allow(non_snake_case)]
 
-use std::future::Future;
 use std::task::Poll;
-use std::{fmt::Display, hash::Hash, rc::Rc};
+use std::{marker::PhantomData, rc::Rc};
 
 use wasm_bindgen::{prelude::*, JsCast, JsValue};
 
-use observe::{
-    local::{EvalContext, Value},
-    transaction, Computed, Var,
-};
-
-use rustcss::{
-    color::{BasicColor, Color},
-    prelude::*,
-    PositionType, StyleSheet,
-};
+use observe::{local::Value, transaction, Computed, Var};
 
 use rustweb::{
     context::Render,
+    contrib::list::{List, ListProps, ListStore},
     dom::{el::div, Class, ClassList, Html, Style},
     prelude::*,
     Children,
 };
 
+use store::AppStore;
+use store::{AppProps, Task, Theme};
+
 mod api;
-
-#[derive(Hash, PartialEq, Debug)]
-enum Theme {
-    Square,
-    Circle,
-}
-
-#[derive(Debug)]
-struct AppProps {
-    theme: Value<Theme>,
-    x: Value<i32>,
-    y: Value<i32>,
-}
-
-fn Button(ctx: &mut Render<(), Html>) -> Children<Html> {
-    div().default().children(ctx.children.clone()).into()
-}
-
-#[derive(Debug)]
-pub struct HashableError(anyhow::Error);
-
-impl Display for HashableError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl<E> From<E> for HashableError
-where
-    E: std::error::Error + Send + Sync + 'static,
-{
-    fn from(e: E) -> Self {
-        HashableError(e.into())
-    }
-}
-
-impl Hash for HashableError {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        format!("{:#?}", self.0).hash(state);
-    }
-}
-
-#[observe::store]
-struct AppStore {
-    props: AppProps,
-
-    #[computed]
-    style: Value<Option<StyleSheet>>,
-
-    #[autorun(future = "wasm")]
-    data: Value<Poll<Result<api::TestResponse, HashableError>>>,
-}
-
-fn location() -> url::Url {
-    let location = web_sys::window().unwrap().location().href().expect("Href");
-    url::Url::parse(&location).unwrap()
-}
-
-impl AppStore {
-    #[observe::constructor]
-    fn new(props: AppProps) -> Rc<Self> {
-        Rc::new(AppStore {
-            props,
-            style: Value::uninit(),
-            data: Value::uninit(),
-        })
-    }
-
-    fn style(&self, ev: &mut EvalContext) -> Option<StyleSheet> {
-        let AppProps { x, y, theme } = &self.props;
-
-        let mut style = StyleSheet::new();
-
-        style
-            .height(100.px())
-            .width(200.px())
-            // .background_color(Rgba)
-            .position(PositionType::Absolute);
-
-        if *theme.observe(ev) == Theme::Square {
-            style.background_color(Color::from(BasicColor::Green));
-        } else {
-            style.background_color(Color::from(BasicColor::Red));
-        }
-
-        style.left(x.observe(ev).px());
-        style.top(y.observe(ev).px());
-        Some(style)
-    }
-
-    fn data(
-        &self,
-        _ev: &mut EvalContext,
-    ) -> impl Future<Output = Result<api::TestResponse, HashableError>> {
-        async {
-            let mut url = location();
-            url.set_path("/api/test");
-            let resp = reqwest::get(url).await?.json::<api::TestResponse>().await?;
-            Ok(resp)
-        }
-    }
-}
+mod error;
+mod store;
 
 fn App(ctx: &mut Render<AppStore, Html>) -> Children<Html> {
     let store = ctx.props;
-    let _ = store.props.theme.observe(&mut ctx.eval);
-
     let payload = store.data.clone();
 
     div()
@@ -144,7 +36,21 @@ fn App(ctx: &mut Render<AppStore, Html>) -> Children<Html> {
                 Poll::Pending => String::from("Loading"),
             }))
         })
-        // .child("Test")
+        .child(List::new().with_props(Rc::new(ListStore::new(ListProps {
+            list: store.tasks.clone(),
+            key: Box::new(|task: &Task| &task.id),
+            hint: Default::default(),
+            item: Box::new(move |task, refr| {
+                Rc::new(
+                    div()
+                        .default()
+                        .with_ref(refr)
+                        .child(task.title.clone())
+                        .build(),
+                )
+            }),
+            _t: PhantomData,
+        }))))
         // .child(Button.create().default().child("Test"))
         // .scope(move |_| "Test")
         .into()
@@ -164,6 +70,7 @@ pub fn run() -> Result<(), JsValue> {
         y: y.clone(),
     });
 
+    let store1 = store.clone();
     let app = App.create().with_props(store).build();
 
     let window = web_sys::window().expect("no global `window` exists");
@@ -178,6 +85,24 @@ pub fn run() -> Result<(), JsValue> {
     }) as Box<dyn FnMut(_)>);
 
     let click = Closure::wrap(Box::new(move |_ev: web_sys::MouseEvent| {
+        transaction(None, |tx| {
+            let mut tasks = (*store1.tasks.once()).clone();
+            let uuid = uuid::Uuid::new_v4();
+            let name = format!("Task {}", uuid);
+            tasks.push(Task {
+                id: uuid,
+                title: name,
+                completed: false,
+            });
+            let uuid = uuid::Uuid::new_v4();
+            let name = format!("Task {}", uuid);
+            tasks.push(Task {
+                id: uuid,
+                title: name,
+                completed: false,
+            });
+            store1.tasks.set(tx, tasks)
+        });
         transaction(None, |tx| {
             let current = theme.once();
             theme.set(
@@ -196,7 +121,9 @@ pub fn run() -> Result<(), JsValue> {
     mousemove.forget();
     click.forget();
 
-    let (node, instance) = rustweb::render(Rc::new(app), None)?;
+    let rt = rustweb::Runtime::new();
+
+    let (node, instance) = rt.render(Rc::new(app))?;
     body.append_child(&node)?;
 
     Box::leak(Box::new(instance));
