@@ -2,22 +2,27 @@ use crate::{
     component::{Component, ComponentExt},
     context::Render,
     props::{PropFor, Props},
-    reference::BoundComponentRef,
+    reference::{BoundRef, CompatibleReference},
+    target::Target,
     Children, Func, Layout,
 };
 
 use std::{hash::Hash, rc::Rc};
 
-pub struct LayoutBuilder<C: Component> {
+pub struct LayoutBuilder<C: Component<T>, T>
+where
+    T: Target,
+{
     component: C,
     props: Rc<C::Props>,
-    children: Children<C::Target>,
-    reference: Option<BoundComponentRef<C>>,
+    children: Children<T>,
+    reference: Option<BoundRef<T>>,
 }
 
-impl<C> LayoutBuilder<C>
+impl<C, T> LayoutBuilder<C, T>
 where
-    C: Component,
+    C: Component<T>,
+    T: Target,
 {
     pub fn new(component: C, props: Rc<C::Props>) -> Self {
         LayoutBuilder {
@@ -28,14 +33,14 @@ where
         }
     }
 
-    pub fn with_ref(mut self, refr: BoundComponentRef<C>) -> Self {
-        self.reference = Some(refr);
+    pub fn with_ref(mut self, refr: impl CompatibleReference<C, T>) -> Self {
+        self.reference = Some(refr.to_bound_ref());
         self
     }
 
     pub fn prop<P: PropFor<C> + Hash, V: Into<P::Value>>(mut self, prop: P, value: V) -> Self
     where
-        C: Component<Props = Props<C>>,
+        C: Component<T, Props = Props<C>>,
     {
         let props = Rc::get_mut(&mut self.props).unwrap();
         props.value_for(prop, value.into());
@@ -44,8 +49,8 @@ where
 
     pub fn child<F, CH>(mut self, child: F) -> Self
     where
-        F: Into<Layout<CH>>,
-        CH: Component<Target = C::Target> + 'static,
+        F: Into<Layout<CH, T>>,
+        CH: Component<T> + 'static,
     {
         match self.children.as_mut() {
             Some(children) => children.push(Rc::new(child.into())),
@@ -57,8 +62,8 @@ where
 
     pub fn scope<F, CH>(mut self, child: F) -> Self
     where
-        F: Fn(&mut Render<(), C::Target>) -> CH + 'static,
-        CH: Into<Children<C::Target>>,
+        F: Fn(&mut Render<(), T>) -> CH + 'static,
+        CH: Into<Children<T>>,
     {
         let instance = Func::new(move |ctx| child(ctx).into());
         match self.children.as_mut() {
@@ -69,7 +74,7 @@ where
         self
     }
 
-    pub fn children(mut self, mut children: Children<C::Target>) -> Self {
+    pub fn children(mut self, mut children: Children<T>) -> Self {
         if children.is_none() {
             return self;
         }
@@ -82,16 +87,17 @@ where
         self
     }
 
-    pub fn build(self) -> Layout<C> {
+    pub fn build(self) -> Layout<C, T> {
         Layout::from(self)
     }
 }
 
-impl<C> From<LayoutBuilder<C>> for Layout<C>
+impl<C, T> From<LayoutBuilder<C, T>> for Layout<C, T>
 where
-    C: Component,
+    C: Component<T>,
+    T: Target,
 {
-    fn from(builder: LayoutBuilder<C>) -> Self {
+    fn from(builder: LayoutBuilder<C, T>) -> Self {
         Layout {
             component: builder.component,
             children: builder.children,
@@ -101,11 +107,12 @@ where
     }
 }
 
-impl<C> From<LayoutBuilder<C>> for Children<C::Target>
+impl<C, T> From<LayoutBuilder<C, T>> for Children<T>
 where
-    C: Component,
+    C: Component<T>,
+    T: Target,
 {
-    fn from(builder: LayoutBuilder<C>) -> Self {
+    fn from(builder: LayoutBuilder<C, T>) -> Self {
         Layout::from(builder).into()
     }
 }

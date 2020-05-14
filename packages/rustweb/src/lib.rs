@@ -30,4 +30,4 @@ pub use instance::Instance;
 pub use layout::{Child, Layout};
 pub use props::Props;
 pub use reference::ComponentRef;
-pub use render::render;
+pub use runtime::Runtime;

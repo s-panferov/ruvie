@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-use lis::DiffCallback;
 use rand::seq::SliceRandom;
+use rustweb::contrib::list::diff::DiffCallback;
 
 pub struct Cb;
 impl DiffCallback<(usize, &u32), (usize, &u32)> for Cb {
@@ -13,7 +13,7 @@ impl DiffCallback<(usize, &u32), (usize, &u32)> for Cb {
 
 fn diff(list1: &[u32], list2: &[u32]) {
     let mut cb = Cb;
-    lis::diff_by_key(
+    rustweb::contrib::list::diff::diff_by_key(
         list1.iter().enumerate(),
         |x| &x.1,
         list2.iter().enumerate(),

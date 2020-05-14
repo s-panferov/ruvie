@@ -9,15 +9,10 @@ use crate::Children;
 use super::{Html, HtmlMount};
 use std::rc::Rc;
 
-pub struct TextProps {
-    value: Value<String>,
-}
+pub struct Text;
 
-pub struct Text {}
-
-impl Component for Text {
-    type Props = TextProps;
-    type Target = Html;
+impl Component<Html> for Text {
+    type Props = Value<String>;
 
     fn mount(&self, ctx: &mut HtmlMount) -> Result<Node, JsValue> {
         let el = ctx.doc.create_text_node("EMPTY");
@@ -25,7 +20,7 @@ impl Component for Text {
         ctx.reaction(Self::reaction({
             let el = el.clone();
             move |_, ctx| {
-                let text = Self::props(ctx).value.observe(&mut ctx.eval);
+                let text = Self::props(ctx).observe(&mut ctx.eval);
                 el.set_node_value(Some(&text));
                 Ok(())
             }
@@ -39,27 +34,23 @@ impl Component for Text {
     }
 }
 
-impl From<String> for Layout<Text> {
+impl From<String> for Layout<Text, Html> {
     fn from(value: String) -> Self {
         Layout {
             reference: None,
             component: Text {},
-            props: Rc::new(TextProps {
-                value: value.into(),
-            }),
+            props: Rc::new(value.into()),
             children: None.into(),
         }
     }
 }
 
-impl From<&str> for Layout<Text> {
+impl From<&str> for Layout<Text, Html> {
     fn from(value: &str) -> Self {
         Layout {
             reference: None,
             component: Text {},
-            props: Rc::new(TextProps {
-                value: value.to_owned().into(),
-            }),
+            props: Rc::new(value.to_owned().into()),
             children: None.into(),
         }
     }
@@ -70,7 +61,7 @@ impl From<Value<String>> for Children<Html> {
         Layout {
             reference: None,
             component: Text {},
-            props: Rc::new(TextProps { value }),
+            props: Rc::new(value),
             children: None.into(),
         }
         .into()

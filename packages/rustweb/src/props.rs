@@ -1,7 +1,5 @@
 use std::collections::hash_map::DefaultHasher;
 
-use crate::Component;
-
 use downcast_rs::{impl_downcast, Downcast};
 use std::{
     any::TypeId,
@@ -14,7 +12,7 @@ pub trait Prop {
     type Value;
 }
 
-pub trait PropFor<C: Component>: Prop + Downcast {}
+pub trait PropFor<C>: Prop + Downcast {}
 
 struct PropValue<P>
 where
@@ -41,17 +39,16 @@ where
     }
 }
 
-trait ComponentPropValue<C: Component>: Downcast {
+trait ComponentPropValue<C>: Downcast {
     fn prop_hash(&self) -> u64;
     // fn is(&self, id: TypeId) -> bool;
 }
 
-impl_downcast!(ComponentPropValue<C> where C: Component);
+impl_downcast!(ComponentPropValue<C>);
 
 impl<C, P> ComponentPropValue<C> for PropValue<P>
 where
     P: PropFor<C> + Hash + 'static,
-    C: Component,
 {
     fn prop_hash(&self) -> u64 {
         let mut s = DefaultHasher::new();
@@ -60,53 +57,41 @@ where
     }
 }
 
-pub struct BoxedValue<C>
-where
-    C: Component,
-{
+pub struct BoxedValue<C> {
     value: Box<dyn ComponentPropValue<C>>,
 }
 
-impl<C> BoxedValue<C>
-where
-    C: Component,
-{
-    pub fn downcast<P: PropFor<C> + Hash>(&self) -> Option<(&P, &P::Value)> {
+impl<C> BoxedValue<C> {
+    pub fn downcast<P: PropFor<C> + Hash>(&self) -> Option<(&P, &P::Value)>
+    where
+        C: 'static,
+    {
         self.value
             .downcast_ref::<PropValue<P>>()
             .map(|v| (&v.prop, &v.value))
     }
 }
 
-impl<C> Hash for BoxedValue<C>
-where
-    C: Component,
-{
+impl<C> Hash for BoxedValue<C> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.value.prop_hash().hash(state)
     }
 }
 
-impl<C> PartialEq<BoxedValue<C>> for BoxedValue<C>
-where
-    C: Component,
-{
+impl<C> PartialEq<BoxedValue<C>> for BoxedValue<C> {
     fn eq(&self, other: &BoxedValue<C>) -> bool {
         self.value.prop_hash() == other.value.prop_hash()
     }
 }
 
-impl<C> Eq for BoxedValue<C> where C: Component {}
+impl<C> Eq for BoxedValue<C> {}
 
-pub struct Props<C: Component> {
+pub struct Props<C> {
     _c: PhantomData<C>,
     pub props: HashSet<BoxedValue<C>>,
 }
 
-impl<C> Props<C>
-where
-    C: Component,
-{
+impl<C> Props<C> {
     pub fn new() -> Self {
         Props {
             _c: PhantomData,
@@ -122,10 +107,7 @@ where
     }
 }
 
-impl<C> Default for Props<C>
-where
-    C: Component,
-{
+impl<C> Default for Props<C> {
     fn default() -> Self {
         Props {
             _c: PhantomData,
@@ -134,10 +116,6 @@ where
     }
 }
 
-pub trait DynamicProps<C>
-where
-    C: Component,
-{
-}
+pub trait DynamicProps<C> {}
 
-impl<C> DynamicProps<C> for Props<C> where C: Component {}
+impl<C> DynamicProps<C> for Props<C> {}

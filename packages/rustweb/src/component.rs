@@ -11,35 +11,38 @@ use crate::{
 use std::{any::Any, hash::Hash, rc::Rc};
 
 /// Basic system trait all components should implement
-pub trait Component: 'static + Sized {
+pub trait Component<T: Target>: 'static + Sized {
     type Props: Any;
-    type Target: Target;
 
     /// Defines component name. Useful for debugging.
     fn name(&self) -> &'static str {
         return "Component";
     }
 
+    fn should_render(&self, _props: &Self::Props) -> bool {
+        true
+    }
+
     /// Main function that defines component layout
-    fn render(&self, _ctx: &mut Render<Self::Props, Self::Target>) -> Children<Self::Target> {
+    fn render(&self, _ctx: &mut Render<Self::Props, T>) -> Children<T> {
         _ctx.children.clone()
     }
 
-    fn after_render(&self, _ctx: &mut AfterRender<Self::Target>) {}
+    fn after_render(&self, _ctx: &mut AfterRender<T>) {}
 
     fn before_unmount(&self) {}
 
-    fn mount(
-        &self,
-        ctx: &mut <Self::Target as Target>::Mount,
-    ) -> Result<<Self::Target as Target>::Result, <Self::Target as Target>::Error> {
-        Self::Target::mount_component(ctx)
+    fn mount(&self, ctx: &mut T::Mount) -> Result<T::Result, T::Error> {
+        T::mount_component(ctx)
     }
 }
 
-pub trait ComponentExt: Component {
+pub trait ComponentExt<T>: Component<T>
+where
+    T: Target,
+{
     /// Get props from various available contexts
-    fn props(ctx: &Rc<Instance<Self::Target>>) -> Rc<Self::Props> {
+    fn props(ctx: &Rc<Instance<T>>) -> Rc<Self::Props> {
         ctx.spec
             .layout
             .props()
@@ -48,18 +51,18 @@ pub trait ComponentExt: Component {
     }
 
     /// Wrap a reference
-    fn reference<C: Component<Target = Self::Target>>(
-        instance: &Rc<Instance<Self::Target>>,
-        reference: &ComponentRef<C>,
-    ) -> BoundComponentRef<C> {
+    fn reference<C: Component<T>>(
+        instance: &Rc<Instance<T>>,
+        reference: &ComponentRef<C, T>,
+    ) -> BoundComponentRef<C, T> {
         reference.bind(&instance)
     }
 
     /// Wrap a handler function to create an Event object that can
     /// sent to another component as an event handler
-    fn handler<F, E>(instance: &Rc<Instance<Self::Target>>, handler: F) -> Event<E>
+    fn handler<F, E>(instance: &Rc<Instance<T>>, handler: F) -> Event<E>
     where
-        F: Fn(&Self, Handler<E, Self::Target>) + 'static,
+        F: Fn(&Self, Handler<E, T>) + 'static,
         E: 'static,
     {
         let instance = Rc::downgrade(&instance);
@@ -89,9 +92,9 @@ pub trait ComponentExt: Component {
     /// Wrap a reaction callback to be run in the context of the component
     fn reaction<F, R>(
         handler: F,
-    ) -> Box<dyn for<'a> Fn(&'a Instance<Self::Target>, &'a mut Update<'a, Self::Target>) -> R>
+    ) -> Box<dyn for<'a> Fn(&'a Instance<T>, &'a mut Update<'a, T>) -> R>
     where
-        F: for<'a> Fn(&'a Self, &mut Update<'a, Self::Target>) -> R + 'static,
+        F: for<'a> Fn(&'a Self, &mut Update<'a, T>) -> R + 'static,
     {
         Box::new(move |instance, ctx| {
             let component = instance
@@ -104,7 +107,7 @@ pub trait ComponentExt: Component {
         })
     }
 
-    fn with_props(self, props: Rc<Self::Props>) -> LayoutBuilder<Self> {
+    fn with_props(self, props: Rc<Self::Props>) -> LayoutBuilder<Self, T> {
         LayoutBuilder::new(self, props)
     }
 
@@ -112,16 +115,16 @@ pub trait ComponentExt: Component {
         self,
         prop: P,
         value: V,
-    ) -> LayoutBuilder<Self>
+    ) -> LayoutBuilder<Self, T>
     where
-        Self: Component<Props = Props<Self>>,
+        Self: Component<T, Props = Props<Self>>,
     {
         let mut props = Props::new();
         props.value_for(prop, value.into());
         LayoutBuilder::new(self, Rc::new(props))
     }
 
-    fn default(self) -> LayoutBuilder<Self>
+    fn default(self) -> LayoutBuilder<Self, T>
     where
         Self::Props: Default,
     {
@@ -129,4 +132,9 @@ pub trait ComponentExt: Component {
     }
 }
 
-impl<T> ComponentExt for T where T: Component {}
+impl<C, T> ComponentExt<T> for C
+where
+    C: Component<T>,
+    T: Target,
+{
+}

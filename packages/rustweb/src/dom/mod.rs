@@ -5,6 +5,7 @@ pub use utils::node;
 
 mod attr;
 mod event;
+mod fragment;
 mod html;
 mod mount;
 mod text;

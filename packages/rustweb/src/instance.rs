@@ -1,6 +1,7 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::{
     collections::{HashMap, HashSet},
+    hash::Hash,
     rc::{Rc, Weak},
 };
 
@@ -8,12 +9,12 @@ use observe::{
     local::{EvalContext, Local},
     Evaluation, Tracker, WeakTracker,
 };
-use snowflake::ProcessUniqueId;
 
 use crate::children::Children;
 use crate::runtime::Runtime;
 use crate::{
     context::{AfterRender, Mount, Update},
+    reference::BoundRef,
     target::Target,
     Child,
 };
@@ -32,15 +33,15 @@ pub struct Instance<T: Target> {
 
 pub struct InstanceState<T: Target> {
     rendered_tree: Children<T>,
-    children: Vec<Rc<Instance<T>>>,
+    pub children: Vec<Rc<Instance<T>>>,
     render_rx: Tracker,
     is_render_scheduled: bool,
     is_update_scheduled: bool,
     update_res: Result<(), T::Error>,
     all_update_reactions: Vec<Tracker<Local>>,
     invalidated_updates: HashSet<WeakTracker<Local>>,
-    references: HashMap<ProcessUniqueId, Weak<Instance<T>>>,
-    pub(crate) platform: Option<T::Instance>,
+    references: HashMap<u64, Weak<Instance<T>>>,
+    pub(crate) target: Option<T::State>,
 }
 
 impl<T: Target> Instance<T> {
@@ -54,7 +55,7 @@ impl<T: Target> Instance<T> {
             update_res: Ok(()),
             is_render_scheduled: false,
             is_update_scheduled: false,
-            platform: None,
+            target: None,
             references: HashMap::new(),
         };
 
@@ -74,12 +75,30 @@ impl<T: Target> Instance<T> {
         instance
     }
 
+    pub(crate) fn add_child(&self, child: Rc<Instance<T>>) {
+        self.state_mut().children.push(child)
+    }
+
     pub(crate) fn state(&self) -> Ref<InstanceState<T>> {
         self.state.borrow()
     }
 
     pub(crate) fn state_mut(&self) -> RefMut<InstanceState<T>> {
         self.state.borrow_mut()
+    }
+
+    pub fn render_child(
+        self: &Rc<Self>,
+        layout: Rc<dyn Child<T>>,
+    ) -> Result<(T::Result, Rc<Instance<T>>), T::Error> {
+        let instance = Instance::new(InstanceDef {
+            runtime: self.spec.runtime.clone(),
+            level: self.spec.level + 1,
+            parent: Some(Rc::downgrade(&self)),
+            layout,
+        });
+        let res = instance.perform_render()?;
+        Ok((res, instance))
     }
 
     pub(crate) fn render(self: &Rc<Instance<T>>, eval: &mut EvalContext) {
@@ -137,12 +156,15 @@ impl<T: Target> Instance<T> {
         Ok(res)
     }
 
-    pub(crate) fn register_reference(
-        self: &Rc<Self>,
-        id: ProcessUniqueId,
-        inst: Weak<Instance<T>>,
-    ) {
-        self.state_mut().references.insert(id, inst);
+    pub fn reference_any<K: Hash>(self: &Rc<Self>, reference: &K) -> BoundRef<T> {
+        BoundRef {
+            parent: Rc::downgrade(&self),
+            id: fxhash::hash64(&reference),
+        }
+    }
+
+    pub fn register_reference<K: Hash>(self: &Rc<Self>, id: &K, inst: Weak<Instance<T>>) {
+        self.state_mut().references.insert(fxhash::hash64(id), inst);
     }
 
     pub(crate) fn perform_update(&self) -> Result<(), T::Error> {
@@ -194,9 +216,9 @@ impl<T: Target> Instance<T> {
         self.spec.layout.before_unmount()
     }
 
-    pub(crate) fn get(&self, refr: &ProcessUniqueId) -> Option<Rc<Instance<T>>> {
+    pub(crate) fn get<K: Hash>(&self, refr: &K) -> Option<Rc<Instance<T>>> {
         let state = self.state();
-        let res = state.references.get(&refr);
+        let res = state.references.get(&fxhash::hash64(refr));
         res.and_then(|inst| inst.upgrade())
     }
 }

@@ -36,7 +36,7 @@ impl<F: Fn(&mut Render<P, T>) -> Children<T>, P, T: Target> Func<F, P, T> {
     }
 }
 
-impl<F, P, T: Target> Component for Func<F, P, T>
+impl<F, P, T: Target> Component<T> for Func<F, P, T>
 where
     F: Fn(&mut Render<P, T>) -> Children<T>,
     F: 'static,
@@ -44,14 +44,13 @@ where
     T: 'static,
 {
     type Props = P;
-    type Target = T;
 
     fn render(&self, ctx: &mut Render<P, T>) -> Children<T> {
         (self.func)(ctx)
     }
 }
 
-impl<F, T: Target> From<F> for Layout<Func<F, (), T>>
+impl<F, T: Target> From<F> for Layout<Func<F, (), T>, T>
 where
     F: Fn(&mut Render<(), T>) -> Children<T>,
     F: 'static,

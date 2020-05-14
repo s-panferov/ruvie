@@ -42,9 +42,8 @@ impl PropFor<Div> for ContentEditable {}
 impl PropFor<Div> for OnClick {}
 impl PropFor<Div> for OnBeforeInput {}
 
-impl Component for Div {
+impl Component<Html> for Div {
     type Props = Props<Self>;
-    type Target = Html;
 
     fn mount(&self, ctx: &mut HtmlMount) -> Result<Node, JsValue> {
         let el = ctx.doc.create_element("div")?;

@@ -3,7 +3,7 @@ use std::{
     rc::Rc,
 };
 
-use crate::{Child, Component, Layout};
+use crate::{target::Target, Child, Component, Layout};
 
 #[derive(Clone)]
 pub struct Children<T> {
@@ -55,8 +55,11 @@ impl<T> From<Rc<dyn Child<T>>> for Children<T> {
     }
 }
 
-impl<C: Component> From<Layout<C>> for Children<C::Target> {
-    fn from(children: Layout<C>) -> Self {
+impl<C: Component<T>, T> From<Layout<C, T>> for Children<T>
+where
+    T: Target,
+{
+    fn from(children: Layout<C, T>) -> Self {
         Children {
             children: Some(vec![Rc::new(children)]),
         }
