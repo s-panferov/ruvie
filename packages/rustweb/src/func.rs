@@ -1,66 +1,74 @@
-use std::{marker::PhantomData, rc::Rc};
+use std::{marker::PhantomData, sync::Arc};
 
 use crate::children::Children;
-use crate::{context::Render, target::Target, Component, Layout};
+use crate::{
+	context::Render, element::ElementFactory, instance::Instance, target::Target, view::WeakView,
+	Component, Element, Scope,
+};
 
-pub trait FunctionalComponent<F: Fn(&mut Render<P, T>) -> Children<T>, P, T: Target> {
-    fn create(self) -> Func<F, P, T>;
-}
-
-impl<F, P, T: Target> FunctionalComponent<F, P, T> for F
+pub struct Func<F, T>
 where
-    F: Fn(&mut Render<P, T>) -> Children<T>,
+	F: Fn(&Render<T>) -> Children<T> + 'static,
+	T: Target,
 {
-    fn create(self) -> Func<F, P, T> {
-        Func {
-            func: self,
-            p: PhantomData,
-            t: PhantomData,
-        }
-    }
+	func: Arc<F>,
+	t: PhantomData<T>,
 }
 
-pub struct Func<F: Fn(&mut Render<P, T>) -> Children<T>, P, T: Target> {
-    func: F,
-    p: PhantomData<P>,
-    t: PhantomData<T>,
-}
-
-impl<F: Fn(&mut Render<P, T>) -> Children<T>, P, T: Target> Func<F, P, T> {
-    pub fn new(func: F) -> Self {
-        Func {
-            func,
-            p: PhantomData,
-            t: PhantomData,
-        }
-    }
-}
-
-impl<F, P, T: Target> Component<T> for Func<F, P, T>
+impl<F, T> Clone for Func<F, T>
 where
-    F: Fn(&mut Render<P, T>) -> Children<T>,
-    F: 'static,
-    P: 'static,
-    T: 'static,
+	F: Fn(&Render<T>) -> Children<T> + 'static,
+	T: Target,
 {
-    type Props = P;
-
-    fn render(&self, ctx: &mut Render<P, T>) -> Children<T> {
-        (self.func)(ctx)
-    }
+	fn clone(&self) -> Self {
+		Func {
+			func: self.func.clone(),
+			t: PhantomData,
+		}
+	}
 }
 
-impl<F, T: Target> From<F> for Layout<Func<F, (), T>, T>
+impl<F, T> ElementFactory<T> for Func<F, T>
 where
-    F: Fn(&mut Render<(), T>) -> Children<T>,
-    F: 'static,
+	F: Fn(&Render<T>) -> Children<T> + 'static,
+	T: Target,
 {
-    fn from(func: F) -> Self {
-        Layout {
-            reference: None,
-            component: Func::new(func),
-            props: Rc::new(()),
-            children: None.into(),
-        }
-    }
+	fn instance(&self, _view: WeakView<T>) -> Box<dyn Instance<T>> {
+		Box::new(self.clone())
+	}
+}
+
+impl<F, T> Func<F, T>
+where
+	F: Fn(&Render<T>) -> Children<T> + 'static,
+	T: Target,
+{
+	pub fn build(func: F) -> Element<T> {
+		Element {
+			inner: Arc::new(Func {
+				func: Arc::new(func),
+				t: PhantomData,
+			}),
+		}
+	}
+}
+
+impl<F, T> Component<T> for Func<F, T>
+where
+	F: Fn(&Render<T>) -> Children<T> + 'static,
+	T: Target,
+{
+	type Props = ();
+
+	fn create(_props: Self::Props, _scope: Scope<Self, T>) -> Self {
+		unreachable!()
+	}
+
+	fn name() -> &'static str {
+		"Function"
+	}
+
+	fn render(&mut self, ctx: &Render<T>) -> Children<T> {
+		(self.func)(ctx)
+	}
 }

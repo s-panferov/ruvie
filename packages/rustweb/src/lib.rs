@@ -1,33 +1,37 @@
+#![feature(min_specialization)]
+
 mod builder;
 mod children;
 mod component;
 pub mod context;
 pub mod contrib;
+mod element;
 mod event;
 mod func;
+mod html;
 mod instance;
-mod layout;
 mod props;
 mod reference;
-mod render;
 mod runtime;
+mod scope;
 mod target;
+mod test;
+mod view;
 
-#[cfg(feature = "dom")]
-pub mod dom;
+#[cfg(feature = "web")]
+pub mod web;
 
 pub mod prelude {
-    pub use crate::builder::*;
-    pub use crate::component::{Component, ComponentExt};
-    pub use crate::func::FunctionalComponent;
+	pub use crate::builder::*;
+	pub use crate::component::{Component, ComponentExt};
 }
 
 pub use children::Children;
 pub use component::Component;
+pub use element::Element;
 pub use event::Event;
-pub use func::Func;
-pub use instance::Instance;
-pub use layout::{Child, Layout};
 pub use props::Props;
-pub use reference::ComponentRef;
 pub use runtime::Runtime;
+pub use scope::Scope;
+pub use target::{Html, Target};
+pub use view::View;

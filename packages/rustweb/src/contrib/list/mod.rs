@@ -1,265 +1,499 @@
 use crate::{
-    context::Render, prelude::*, reference::BoundRef, target::Target, Child, Children, Component,
-    Instance,
+	context::{Render, Update},
+	target::Target,
+	Children, Component, Element,
 };
 
-use std::{cell::RefCell, hash::Hash, marker::PhantomData, rc::Rc};
+#[cfg(feature = "web")]
+use crate::{
+	component::Lifecycle,
+	scope::Scope,
+	web::{fragment::FragmentChild, Web, WebContext},
+	View,
+};
 
-use observe::local::Value;
+use std::{
+	collections::HashMap,
+	fmt::Debug,
+	hash::{Hash, Hasher},
+	ops::{Deref, DerefMut},
+	sync::Arc,
+};
 
-pub mod diff;
+use wasm_bindgen::JsValue;
 
-use diff::DiffCallback;
+use std::cmp::Ordering::{self};
 
-pub struct ListProps<V, K, T>
-where
-    T: Target,
-    K: Eq + Ord,
-    V: Hash,
-{
-    pub hint: ListHint,
-    pub list: Value<Vec<V>>,
-    pub key: Box<dyn Fn(&V) -> &K>,
-    pub item: Box<dyn Fn(&V, BoundRef<T>) -> Rc<dyn Child<T>>>,
-    pub _t: PhantomData<T>,
+use observe::{Observable, Value};
+
+mod iter;
+mod store;
+
+pub use store::*;
+
+use indexmap::IndexMap;
+use indexmap::IndexSet;
+
+use iter::IteratorExt;
+
+pub trait IndexListKey: Hash + Eq + Ord + Clone + Debug + 'static {}
+impl<T> IndexListKey for T where T: Hash + Eq + Ord + Clone + Debug + 'static {}
+
+#[derive(Clone)]
+pub struct IndexList<K, V> {
+	map: IndexMap<K, V>,
 }
 
-pub struct ListStore<V, K, T>
-where
-    T: Target,
-    K: Eq + Ord + Clone,
-    V: Hash,
-{
-    props: ListProps<V, K, T>,
-    prev: RefCell<Rc<Vec<V>>>,
+impl<K, V> IndexList<K, V> {
+	fn new() -> Self {
+		IndexList {
+			map: IndexMap::new(),
+		}
+	}
 }
 
-impl<V, K, T> ListStore<V, K, T>
-where
-    T: Target,
-    K: Eq + Ord + Clone,
-    V: Hash,
-{
-    pub fn new(props: ListProps<V, K, T>) -> Self {
-        Self {
-            props,
-            prev: RefCell::new(Rc::new(vec![])),
-        }
-    }
+impl<K, V> From<IndexMap<K, V>> for IndexList<K, V> {
+	fn from(map: IndexMap<K, V>) -> Self {
+		Self { map }
+	}
 }
 
-pub struct List<V, K, T>
+impl<K, V> Hash for IndexList<K, V>
 where
-    T: Target,
-    K: Eq,
-    V: Hash,
+	K: Hash + Eq,
 {
-    _v: PhantomData<V>,
-    _k: PhantomData<K>,
-    _t: PhantomData<T>,
+	fn hash<H: Hasher>(&self, state: &mut H) {
+		for key in self.map.keys() {
+			key.hash(state)
+		}
+	}
+}
+
+impl<K, V> Deref for IndexList<K, V> {
+	type Target = IndexMap<K, V>;
+	fn deref(&self) -> &Self::Target {
+		&self.map
+	}
+}
+
+impl<K, V> DerefMut for IndexList<K, V> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.map
+	}
+}
+
+pub struct ListProps<K, V, T>
+where
+	T: Target,
+	K: IndexListKey,
+	V: 'static,
+{
+	pub hint: ListHint,
+	pub list: Value<Arc<IndexList<K, V>>>,
+	pub item: Arc<dyn Fn(&K, &V) -> Element<T>>,
+}
+
+impl<K, V, T> Clone for ListProps<K, V, T>
+where
+	T: Target,
+	K: IndexListKey,
+	V: 'static,
+{
+	fn clone(&self) -> Self {
+		ListProps {
+			hint: self.hint.clone(),
+			list: self.list.clone(),
+			item: self.item.clone(),
+		}
+	}
+}
+
+pub struct List<K, V, T>
+where
+	T: Target,
+	K: IndexListKey + 'static,
+	V: 'static,
+{
+	store: ListStore<K, V, T>,
+	children: HashMap<K, View<T>>,
+	scope: Scope<Self, T>,
 }
 
 #[derive(PartialEq, Clone, Eq)]
 pub enum ListHint {
-    Append,
-    Prepend,
-    Pop,
-    Shift,
-    Random,
+	Append,
+	Prepend,
+	Pop,
+	Shift,
+	Random,
 }
 
 impl Default for ListHint {
-    fn default() -> Self {
-        ListHint::Random
-    }
+	fn default() -> Self {
+		ListHint::Random
+	}
 }
 
-impl<V, K, T> List<V, K, T>
+#[cfg(feature = "web")]
+impl<K, V, T> Component<T> for List<K, V, T>
 where
-    K: Eq + Ord + Clone + 'static,
-    V: Hash + 'static,
-    T: Target,
+	T: Target,
+	K: IndexListKey + 'static,
+	V: 'static,
 {
-    pub fn new() -> Self {
-        Self {
-            _v: PhantomData,
-            _k: PhantomData,
-            _t: PhantomData,
-        }
-    }
+	type Props = ListProps<K, V, T>;
+
+	fn name() -> &'static str {
+		"List"
+	}
+
+	fn create(props: Self::Props, scope: Scope<Self, T>) -> Self {
+		let store = ListStore::new(props);
+		Self {
+			store,
+			scope,
+			children: HashMap::new(),
+		}
+	}
+
+	fn should_render(&self) -> bool {
+		false
+	}
+
+	fn render(&mut self, _ctx: &Render<T>) -> Children<T> {
+		let store = &mut self.store;
+
+		let mut children = vec![];
+		let list = store.props.list.once().clone();
+		for (k, v) in list.iter() {
+			let item = (store.props.item)(k, v);
+			children.push(item)
+		}
+
+		store.prev = list;
+		children.into()
+	}
 }
 
-#[cfg(feature = "dom")]
-use crate::dom::Html;
-
-#[cfg(feature = "dom")]
-impl<V, K> Component<Html> for List<V, K, Html>
+impl<K, V> Lifecycle<Web> for List<K, V, Web>
 where
-    K: Eq + Ord + Clone + Hash + 'static,
-    V: Hash + 'static,
+	K: IndexListKey + 'static,
+	V: 'static,
 {
-    type Props = ListStore<V, K, Html>;
+	fn mount(&mut self, ctx: &mut WebContext) -> Result<(), JsValue> {
+		if ctx.tree.is_none() {
+			return Ok(());
+		}
 
-    fn render(&self, ctx: &mut Render<Self::Props, Html>) -> Children<Html> {
-        let store = Self::props(ctx);
+		let list = self.store.props.list.once();
 
-        let mut children = vec![];
-        let list = store.props.list.once();
+		let children = ctx.tree.take();
+		for ((k, _v), elem) in list.iter().zip(children.unwrap().into_iter()) {
+			let child = ctx.view.render_child(elem, None)?;
+			child.with_state(|state| {
+				let state = state.as_mut().unwrap();
+				let child_fragment = &state.fragment;
+				ctx.fragment.child(child_fragment.clone());
+				Ok::<(), JsValue>(())
+			})?;
 
-        for child in list.iter() {
-            let key = (store.props.key)(child);
-            let refr = ctx.reference_any(&key);
-            let item = (store.props.item)(child, refr);
-            children.push(item)
-        }
+			self.children.insert(k.clone(), child);
+		}
 
-        *store.prev.borrow_mut() = list;
-        children.into()
-    }
+		Ok(())
+	}
 
-    fn after_render(&self, ctx: &mut crate::context::AfterRender<Html>) {
-        let store = Self::props(ctx);
-        ctx.reaction(Self::reaction(move |_, ctx| {
-            let mut prev = store.prev.borrow_mut();
-            let next = store.props.list.observe(ctx.eval);
-            let hint = store.props.hint.clone();
-            let mut diff_cb = DiffApply::<V, K, Html> {
-                _v: PhantomData,
-                store: &store,
-                instance: &ctx,
-            };
+	fn after_render(&mut self, ctx: &mut crate::context::AfterRender<Web>) {
+		let reaction = self
+			.scope
+			.reaction(move |this: &mut Self, ctx: &mut Update<Web>| {
+				let next = this.store.props.list.get(ctx.eval).clone();
+				let hint = this.store.props.hint.clone();
+				let prev = this.store.prev.clone();
 
-            diff(&prev, &next, hint, &store.props.key, &mut diff_cb);
-            *prev = next;
+				let mut diff_cb = DiffApply {
+					view: ctx.view,
+					list: this,
+					next: &next,
+				};
 
-            // TODO we need to create a struct to be a callback for the diff operation
+				diff_with_hint(&prev, &next, hint, &mut diff_cb);
+				this.store.prev = next;
 
-            Ok(())
-        }));
-    }
+				Ok(())
+			});
+
+		ctx.reaction(reaction);
+	}
 }
 
-pub struct DiffApply<'a, V, K, T>
+pub struct DiffApply<'a, K, V>
 where
-    T: Target,
-    V: Hash,
-    K: Hash + Ord + Clone,
+	K: IndexListKey,
+	V: 'static,
 {
-    _v: PhantomData<V>,
-    store: &'a ListStore<V, K, T>,
-    instance: &'a Rc<Instance<T>>,
+	view: &'a View<Web>,
+	list: &'a mut List<K, V, Web>,
+	next: &'a IndexList<K, V>,
 }
 
-#[cfg(feature = "dom")]
-impl<'a, V, K> DiffCallback<(usize, &V), (usize, &V)> for DiffApply<'a, V, K, Html>
+impl<'a, K, V> DiffApply<'a, K, V>
 where
-    V: Hash,
-    K: Hash + Ord + Clone,
+	K: IndexListKey,
+	V: 'static,
 {
-    fn inserted(&mut self, (idx, v): (usize, &V)) {
-        let refr = self.instance.reference_any((self.store.props.key)(v));
-        let (dom_node, child) = self
-            .instance
-            .render_child((self.store.props.item)(v, refr))
-            .unwrap();
-
-        let mut state = self.instance.state_mut();
-        state.children.insert(idx, child);
-
-        let prev_child = &mut state.children.get(idx - 1);
-
-        if let Some(prev_child) = prev_child {
-            let mut prev_state = prev_child.state_mut();
-            let target = prev_state.target.as_mut().unwrap();
-            let prev_node = target.nodes.first().unwrap();
-            before_node
-                .parent_element()
-                .unwrap()
-                .insert_before(&dom_node, Some(&before_node))
-                .unwrap();
-        } else {
-            let target_state = state.target.as_mut().unwrap();
-            let first_node = &target_state.nodes[0];
-            first_node
-                .parent_element()
-                .unwrap()
-                .insert_before(&dom_node, None)
-                .unwrap();
-        }
-    }
-
-    fn removed(&mut self, old: (usize, &V)) {}
-    fn unchanged(&mut self, old: (usize, &V), new: (usize, &V)) {}
-    fn moved(&mut self, old: (usize, &V), new: (usize, &V)) {}
 }
 
-pub fn diff<'a, V, K, C>(
-    prev: &'a [V],
-    next: &'a [V],
-    hint: ListHint,
-    key: &dyn for<'b> Fn(&'b V) -> &'b K,
-    cb: &mut C,
+#[cfg(feature = "web")]
+impl<'a, K, V> DiffCallback<K> for DiffApply<'a, K, V>
+where
+	K: IndexListKey,
+	V: 'static,
+{
+	fn inserted(&mut self, key: &K) {
+		web_sys::console::log_1(&format!("Inserted {:?}", key).into());
+
+		let item_foo = &self.list.store.props.item;
+		let element = item_foo(key, &self.next[key]);
+		let child = self.list.scope.child(element, None).unwrap();
+
+		{
+			let fragment = &self.view.platform().fragment;
+			let child_fragment = &child.platform().fragment;
+
+			let idx = self.next.get_full(key).unwrap().0;
+			let before = self
+				.next
+				.get_index(idx + 1)
+				.and_then(|r| self.list.children.get(r.0))
+				.map(|v| v.platform().fragment.borrow().left());
+
+			fragment
+				.borrow_mut()
+				.insert_child(FragmentChild::from(child_fragment.clone()), before)
+				.unwrap();
+		}
+
+		self.list.children.insert(key.clone(), child);
+	}
+
+	fn removed(&mut self, key: &K) {
+		let child = self.list.children.remove(key);
+		match child {
+			Some(child) => {
+				let child_fragment = &child.platform().fragment;
+				self.view
+					.platform()
+					.fragment
+					.borrow_mut()
+					.remove_child(&child_fragment)
+					.unwrap();
+			}
+			None => unreachable!(),
+		}
+	}
+
+	fn moved(&mut self, key: &K) {
+		web_sys::console::log_1(&format!("Moved {:?}", key).into());
+
+		let idx = self.next.get_full(key).unwrap().0;
+		let before = self
+			.next
+			.get_index(idx + 1)
+			.and_then(|r| self.list.children.get(r.0))
+			.map(|v| v.platform().fragment.borrow().left());
+
+		let child = self.list.children.get(key).unwrap();
+		let child_fragment = &child.platform().fragment;
+
+		let fragment = &self.view.platform().fragment;
+		fragment
+			.borrow_mut()
+			.move_child(child_fragment, before)
+			.unwrap();
+	}
+}
+
+/// Gets notified for each step of the diffing process.
+pub trait DiffCallback<K> {
+	/// Called when a new element was inserted.
+	fn inserted(&mut self, key: &K);
+
+	/// Called when an element was removed.
+	fn removed(&mut self, key: &K);
+
+	/// Called when an element was moved.
+	///
+	/// The default definition reduces to calls to [`removed`] and [`inserted`].
+	fn moved(&mut self, key: &K);
+}
+
+pub fn diff_with_hint<K, V, C>(
+	prev: &IndexList<K, V>,
+	next: &IndexList<K, V>,
+	hint: ListHint,
+	cb: &mut C,
 ) where
-    K: Eq + PartialEq + Hash + Clone,
-    V: 'static,
-    C: DiffCallback<(usize, &'a V), (usize, &'a V)>,
+	K: IndexListKey,
+	C: DiffCallback<K>,
 {
-    let next_len = next.len();
-    let prev_len = prev.len();
+	let next_len = next.len();
+	let prev_len = prev.len();
 
-    if hint == ListHint::Append {
-        if next_len > prev_len {
-            let new_elements = &next[(prev_len - 1)..];
-            new_elements
-                .iter()
-                .enumerate()
-                .for_each(|(idx, el)| cb.inserted((idx, el)));
-            return;
-        } else if next_len == prev_len {
-            return;
-        }
-    } else if hint == ListHint::Pop {
-        if next_len < prev_len {
-            let removed_elements = &prev[(next_len - 1)..];
-            removed_elements
-                .iter()
-                .enumerate()
-                .for_each(|(idx, el)| cb.removed((next_len + idx, el)));
-            return;
-        } else if next_len == prev_len {
-            // Nothing changed
-            return;
-        }
-    } else if hint == ListHint::Prepend {
-        if next_len > prev_len {
-            let new_elements = &next[0..(next_len - prev_len)];
-            new_elements
-                .iter()
-                .enumerate()
-                .for_each(|(idx, el)| cb.inserted((idx, el)));
-            return;
-        } else if next_len == prev_len {
-            return;
-        }
-    } else if hint == ListHint::Shift {
-        if next_len < prev_len {
-            let removed_elements = &next[0..(prev_len - next_len)];
-            removed_elements
-                .iter()
-                .enumerate()
-                .for_each(|(idx, el)| cb.removed((idx, el)));
-            return;
-        } else if next_len == prev_len {
-            // Nothing changed
-            return;
-        }
-    }
+	if hint == ListHint::Append {
+		if next_len > prev_len {
+			next.iter().skip(prev_len).for_each(|(k, _)| cb.inserted(k));
+			return;
+		} else if next_len == prev_len {
+			return;
+		}
+	} else if hint == ListHint::Pop {
+		if next_len < prev_len {
+			prev.iter().skip(next_len).for_each(|(k, _)| cb.removed(k));
+			return;
+		} else if next_len == prev_len {
+			// Nothing changed
+			return;
+		}
+	} else if hint == ListHint::Prepend {
+		if next_len > prev_len {
+			next.iter()
+				.take(next_len - prev_len)
+				.for_each(|(k, _)| cb.inserted(k));
+			return;
+		} else if next_len == prev_len {
+			return;
+		}
+	} else if hint == ListHint::Shift {
+		if next_len < prev_len {
+			next.iter()
+				.take(prev_len - next_len)
+				.for_each(|(k, _)| cb.removed(k));
+			return;
+		} else if next_len == prev_len {
+			// Nothing changed
+			return;
+		}
+	}
 
-    diff::diff_by_key(
-        prev.iter().enumerate(),
-        |x| key(&x.1),
-        next.iter().enumerate(),
-        |x| key(&x.1),
-        cb,
-    );
+	diff(prev, next, cb)
+}
+
+fn diff<K, V, C>(prev: &IndexList<K, V>, next: &IndexList<K, V>, cb: &mut C)
+where
+	K: IndexListKey,
+	C: DiffCallback<K>,
+{
+	let mut prev_iter = prev.keys().de_peekable();
+	let mut next_iter = next.keys().de_peekable();
+
+	// Sync nodes with same key at start
+	while prev_iter
+		.peek()
+		.and_then(|kprev| next_iter.peek().filter(|knext| *kprev == **knext))
+		.is_some()
+	{
+		prev_iter.next().unwrap();
+		next_iter.next().unwrap();
+	}
+
+	// Sync nodes with same key at end
+	while prev_iter
+		.peek_back()
+		.and_then(|kprev| next_iter.peek_back().filter(|knext| *kprev == **knext))
+		.is_some()
+	{
+		prev_iter.next_back().unwrap();
+		next_iter.next_back().unwrap();
+	}
+
+	if prev_iter.peek().is_none() {
+		return next_iter.for_each(|k| cb.inserted(k)); // If all of `prev` was synced, add remaining in `next`
+	} else if next_iter.peek().is_none() {
+		return prev_iter.for_each(|k| cb.removed(k)); // If all of `next` was synced, remove remaining in `prev`
+	}
+
+	let mut moved: IndexSet<K> = IndexSet::new();
+
+	for key in next_iter {
+		let pk = prev.get_full(key);
+
+		match pk {
+			None => cb.inserted(key),
+			Some(_) => {
+				moved.insert(key.clone());
+			}
+		}
+	}
+
+	for key in prev_iter {
+		let nk = next.get_full(key);
+		match nk {
+			None => cb.removed(key),
+			Some(_) => {}
+		}
+	}
+
+	web_sys::console::log_1(&format!("MOVED: {:?}", moved).into());
+
+	if moved.len() > 0 {
+		let lis = longest_increasing_subsequence_by(&moved, |a, b| {
+			let a = prev.get_full(a).unwrap().0;
+			let b = prev.get_full(b).unwrap().0;
+			a.cmp(&b)
+		});
+
+		web_sys::console::log_1(&format!("LIS: {:?}", lis).into());
+
+		let mut seq = lis.into_iter().rev().peekable();
+
+		for (idx, key) in moved.iter().enumerate().rev() {
+			if let Some(true) = seq.peek().map(|v| *v == idx) {
+				seq.next();
+			} else {
+				cb.moved(key)
+			}
+		}
+	}
+}
+
+fn longest_increasing_subsequence_by<F, K>(a: &IndexSet<K>, mut f: F) -> Vec<usize>
+where
+	F: FnMut(&K, &K) -> Ordering,
+	K: IndexListKey,
+{
+	let (mut p, mut m) = (vec![0; a.len()], Vec::with_capacity(a.len()));
+	let mut it = a.iter().enumerate();
+	m.push(if let Some((i, _)) = it.next() {
+		i
+	} else {
+		return Vec::new(); // The array was empty
+	});
+
+	for (i, x) in it {
+		// Test whether a[i] can extend the current sequence
+		if f(&a.get_index(*m.last().unwrap()).unwrap(), x) == Ordering::Less {
+			p[i] = *m.last().unwrap();
+			m.push(i);
+			continue;
+		}
+
+		// Binary search for largest j ≤ m.len() such that a[m[j]] < a[i]
+		let j =
+			match m.binary_search_by(|&j| f(&a.get_index(j).unwrap(), x).then(Ordering::Greater)) {
+				Ok(j) | Err(j) => j,
+			};
+		if j > 0 {
+			p[i] = m[j - 1];
+		}
+		m[j] = i;
+	}
+
+	// Reconstruct the longest increasing subsequence
+	let mut k = *m.last().unwrap();
+	for i in (0..m.len()).rev() {
+		m[i] = k;
+		k = p[k];
+	}
+	m
 }

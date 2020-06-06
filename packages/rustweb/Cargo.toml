@@ -15,6 +15,8 @@ observe={path = "../../../observe"}
 rustcss={path = "../rustcss"}
 snowflake = "1.3.0"
 fxhash="*"
+parking_lot="*"
+indexmap="*"
 
 # DOM:
 
@@ -34,15 +36,16 @@ web-sys = { version = "0.3.39", optional=true, features = [
   'MouseEvent',
   'Node',
   'Window',
+  'Range'
 ] }
 
 [features]
-default=[]
-dom = ["js-sys", "web-sys", "wasm-bindgen", "console_error_panic_hook"]
+default=["web"]
+web = ["js-sys", "web-sys", "wasm-bindgen", "console_error_panic_hook"]
 
 [dev-dependencies]
 criterion = "0.3"
-rand="*"
+rand={version= "*", features = ["wasm-bindgen"]}
 wasm-bindgen-test = "0.3.0"
 
 [[bench]]
