@@ -1,19 +1,17 @@
-use crate::instance::Instance;
-use crate::target::Target;
-use std::{ops::Deref, rc::Rc};
+use crate::{target::Target, view::ReactionCallback};
 
-pub struct AfterRender<T: Target> {
-    pub(crate) instance: Rc<Instance<T>>,
+pub struct AfterRender<T>
+where
+	T: Target,
+{
+	pub(crate) reactions: Vec<ReactionCallback<T>>,
 }
 
-impl<'a, T> AfterRender<T> where T: Target {}
-
-impl<'a, T> Deref for AfterRender<T>
+impl<T> AfterRender<T>
 where
-    T: Target,
+	T: Target,
 {
-    type Target = Rc<Instance<T>>;
-    fn deref(&self) -> &Self::Target {
-        &self.instance
-    }
+	pub fn reaction(&mut self, handler: ReactionCallback<T>) {
+		self.reactions.push(handler);
+	}
 }

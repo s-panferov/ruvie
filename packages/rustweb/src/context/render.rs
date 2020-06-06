@@ -1,22 +1,14 @@
-use std::{ops::Deref, rc::Rc};
-
-use observe::local::EvalContext;
+use observe::EvalContext;
 
 use crate::children::Children;
-use crate::{instance::Instance, target::Target};
+use crate::target::Target;
 
-pub struct Render<'a, P, T: Target> {
-    pub props: &'a Rc<P>,
-    pub eval: &'a mut EvalContext,
-    pub children: &'a Children<T>,
-    pub(crate) instance: Rc<Instance<T>>,
+pub struct Render<'a, T>
+where
+	T: Target,
+{
+	pub eval: &'a mut EvalContext,
+	pub children: &'a Children<T>,
 }
 
-impl<'a, P, T> Render<'a, P, T> where T: Target {}
-
-impl<'a, P, T: Target> Deref for Render<'a, P, T> {
-    type Target = Rc<Instance<T>>;
-    fn deref(&self) -> &Self::Target {
-        &self.instance
-    }
-}
+// impl<'a, T> Render<'a, T> where T: Target {}
