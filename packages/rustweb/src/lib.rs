@@ -6,8 +6,8 @@ mod component;
 pub mod context;
 pub mod contrib;
 mod element;
-mod event;
 mod func;
+mod handler;
 mod html;
 mod instance;
 mod props;
@@ -24,12 +24,13 @@ pub mod web;
 pub mod prelude {
 	pub use crate::builder::*;
 	pub use crate::component::{Component, ComponentExt};
+	pub use crate::props::DynamicProps;
 }
 
 pub use children::Children;
 pub use component::Component;
 pub use element::Element;
-pub use event::Event;
+pub use handler::Handler;
 pub use props::Props;
 pub use runtime::Runtime;
 pub use scope::Scope;

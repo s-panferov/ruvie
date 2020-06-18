@@ -7,7 +7,7 @@ pub struct Render<'a, T>
 where
 	T: Target,
 {
-	pub eval: &'a mut EvalContext,
+	pub eval: &'a EvalContext,
 	pub children: &'a Children<T>,
 }
 

@@ -8,7 +8,10 @@ use crate::{
 use crate::{
 	component::Lifecycle,
 	scope::Scope,
-	web::{fragment::FragmentChild, Web, WebContext},
+	web::{
+		fragment::{ChildPosition, FragmentChild},
+		Web, WebContext,
+	},
 	View,
 };
 
@@ -22,7 +25,10 @@ use std::{
 
 use wasm_bindgen::JsValue;
 
-use std::cmp::Ordering::{self};
+use std::{
+	borrow::Cow,
+	cmp::Ordering::{self},
+};
 
 use observe::{Observable, Value};
 
@@ -250,7 +256,7 @@ where
 	K: IndexListKey,
 	V: 'static,
 {
-	fn inserted(&mut self, key: &K) {
+	fn inserted(&mut self, key: &K, hint: DiffPositionHint) {
 		web_sys::console::log_1(&format!("Inserted {:?}", key).into());
 
 		let item_foo = &self.list.store.props.item;
@@ -262,22 +268,35 @@ where
 			let child_fragment = &child.platform().fragment;
 
 			let idx = self.next.get_full(key).unwrap().0;
-			let before = self
-				.next
-				.get_index(idx + 1)
-				.and_then(|r| self.list.children.get(r.0))
-				.map(|v| v.platform().fragment.borrow().left());
+
+			let position = match hint {
+				DiffPositionHint::Beginning => ChildPosition::Prepend,
+				DiffPositionHint::End => ChildPosition::Append,
+				DiffPositionHint::BeforeNext => {
+					let before = self
+						.next
+						.get_index(idx + 1)
+						.and_then(|r| self.list.children.get(r.0))
+						.map(|v| v.platform().fragment.borrow().left());
+
+					match before {
+						Some(node) => ChildPosition::Before(Cow::Owned(node)),
+						None => ChildPosition::Append,
+					}
+				}
+			};
 
 			fragment
 				.borrow_mut()
-				.insert_child(FragmentChild::from(child_fragment.clone()), before)
+				.insert_child(FragmentChild::from(child_fragment.clone()), position)
 				.unwrap();
 		}
 
 		self.list.children.insert(key.clone(), child);
 	}
 
-	fn removed(&mut self, key: &K) {
+	fn removed(&mut self, key: &K, hint: DiffPositionHint) {
+		web_sys::console::log_1(&format!("Removed {:?}", key).into());
 		let child = self.list.children.remove(key);
 		match child {
 			Some(child) => {
@@ -314,13 +333,19 @@ where
 	}
 }
 
+pub enum DiffPositionHint {
+	BeforeNext,
+	Beginning,
+	End,
+}
+
 /// Gets notified for each step of the diffing process.
 pub trait DiffCallback<K> {
 	/// Called when a new element was inserted.
-	fn inserted(&mut self, key: &K);
+	fn inserted(&mut self, key: &K, position: DiffPositionHint);
 
 	/// Called when an element was removed.
-	fn removed(&mut self, key: &K);
+	fn removed(&mut self, key: &K, position: DiffPositionHint);
 
 	/// Called when an element was moved.
 	///
@@ -342,14 +367,19 @@ pub fn diff_with_hint<K, V, C>(
 
 	if hint == ListHint::Append {
 		if next_len > prev_len {
-			next.iter().skip(prev_len).for_each(|(k, _)| cb.inserted(k));
+			next.iter()
+				.skip(prev_len)
+				.for_each(|(k, _)| cb.inserted(k, DiffPositionHint::End));
 			return;
 		} else if next_len == prev_len {
 			return;
 		}
 	} else if hint == ListHint::Pop {
 		if next_len < prev_len {
-			prev.iter().skip(next_len).for_each(|(k, _)| cb.removed(k));
+			prev.iter()
+				.skip(next_len)
+				.rev()
+				.for_each(|(k, _)| cb.removed(k, DiffPositionHint::End));
 			return;
 		} else if next_len == prev_len {
 			// Nothing changed
@@ -359,7 +389,7 @@ pub fn diff_with_hint<K, V, C>(
 		if next_len > prev_len {
 			next.iter()
 				.take(next_len - prev_len)
-				.for_each(|(k, _)| cb.inserted(k));
+				.for_each(|(k, _)| cb.inserted(k, DiffPositionHint::Beginning));
 			return;
 		} else if next_len == prev_len {
 			return;
@@ -368,7 +398,7 @@ pub fn diff_with_hint<K, V, C>(
 		if next_len < prev_len {
 			next.iter()
 				.take(prev_len - next_len)
-				.for_each(|(k, _)| cb.removed(k));
+				.for_each(|(k, _)| cb.removed(k, DiffPositionHint::Beginning));
 			return;
 		} else if next_len == prev_len {
 			// Nothing changed
@@ -408,29 +438,20 @@ where
 	}
 
 	if prev_iter.peek().is_none() {
-		return next_iter.for_each(|k| cb.inserted(k)); // If all of `prev` was synced, add remaining in `next`
+		return next_iter
+			.rev()
+			.for_each(|k| cb.inserted(k, DiffPositionHint::BeforeNext)); // If all of `prev` was synced, add remaining in `next`
 	} else if next_iter.peek().is_none() {
-		return prev_iter.for_each(|k| cb.removed(k)); // If all of `next` was synced, remove remaining in `prev`
+		return prev_iter.for_each(|k| cb.removed(k, DiffPositionHint::BeforeNext)); // If all of `next` was synced, remove remaining in `prev`
 	}
 
 	let mut moved: IndexSet<K> = IndexSet::new();
 
-	for key in next_iter {
-		let pk = prev.get_full(key);
-
-		match pk {
-			None => cb.inserted(key),
-			Some(_) => {
-				moved.insert(key.clone());
-			}
-		}
-	}
-
 	for key in prev_iter {
-		let nk = next.get_full(key);
-		match nk {
-			None => cb.removed(key),
-			Some(_) => {}
+		if next.contains_key(key) {
+			moved.insert(key.clone());
+		} else {
+			cb.removed(key, DiffPositionHint::BeforeNext)
 		}
 	}
 
@@ -447,12 +468,21 @@ where
 
 		let mut seq = lis.into_iter().rev().peekable();
 
-		for (idx, key) in moved.iter().enumerate().rev() {
-			if let Some(true) = seq.peek().map(|v| *v == idx) {
-				seq.next();
+		for key in next_iter.rev() {
+			let moved = moved.get_full(key).map(|v| v.0);
+			if let Some(idx) = moved {
+				if let Some(true) = seq.peek().map(|v| *v == idx) {
+					seq.next();
+				} else {
+					cb.moved(key)
+				}
 			} else {
-				cb.moved(key)
+				cb.inserted(key, DiffPositionHint::BeforeNext)
 			}
+		}
+	} else {
+		for key in next_iter.rev() {
+			cb.inserted(key, DiffPositionHint::BeforeNext)
 		}
 	}
 }
@@ -463,7 +493,7 @@ where
 	K: IndexListKey,
 {
 	let (mut p, mut m) = (vec![0; a.len()], Vec::with_capacity(a.len()));
-	let mut it = a.iter().enumerate();
+	let mut it = a.iter().rev().enumerate();
 	m.push(if let Some((i, _)) = it.next() {
 		i
 	} else {

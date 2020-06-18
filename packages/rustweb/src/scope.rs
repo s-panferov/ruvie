@@ -1,9 +1,9 @@
 use crate::{
-	context::{Handler, Update},
+	context::{Event, Update},
 	reference::{Reference, TypedReference},
 	target::Target,
 	view::{ReactionCallback, WeakView},
-	Component, Element, Event, View,
+	Component, Element, Handler, View,
 };
 
 use std::{hash::Hash, marker::PhantomData, sync::Arc};
@@ -67,20 +67,20 @@ where
 
 	/// Wrap a handler function to create an Event object that can
 	/// sent to another component as an event handler
-	pub fn handler<F, E>(&self, handler: F) -> Event<E>
+	pub fn handler<F, E>(&self, handler: F) -> Handler<E>
 	where
-		F: Fn(&mut C, Handler<E, T>) + 'static,
+		F: Fn(&mut C, Event<E, T>) + 'static,
 		E: 'static,
 	{
 		let view = self.view.clone();
 		let handler = Arc::new(handler);
-		Event::new(move |event| {
+		Handler::new(move |event| {
 			if let Some(view) = view.upgrade() {
 				let handler = handler.clone();
 				view.with_instance(move |component| {
 					handler(
 						component.downcast_mut::<C>().unwrap(),
-						Handler {
+						Event {
 							event,
 							_t: PhantomData,
 						},

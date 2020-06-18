@@ -81,8 +81,9 @@ impl Lifecycle<Web> for Div<Web> {
 				for prop in &c.props.props {
 					if let Some((_, style)) = prop.downcast::<Style>() {
 						dynattr!(el, "style", &mut ctx.eval, style);
-					} else if let Some((_, class)) = prop.downcast::<Class>() {
-						dynattr!(el, "class", &mut ctx.eval, class);
+					} else if let Some((_, classlist)) = prop.downcast::<Class>() {
+						let list = classlist.get(ctx.eval).to_string();
+						el.set_attribute("class", &list)?;
 					} else if let Some((_, contenteditable)) = prop.downcast::<ContentEditable>() {
 						dynattr!(el, "contenteditable", &mut ctx.eval, contenteditable);
 					} else if let Some((_, id)) = prop.downcast::<Id>() {

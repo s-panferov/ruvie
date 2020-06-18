@@ -3,28 +3,29 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::Node;
 
-use crate::event::Event;
+use crate::handler::Handler;
 
-pub struct EventHandler<T> {
+pub struct WebHandler<T> {
 	_closure: Closure<dyn Fn(T)>,
 }
 
-pub trait BoxedHandler {}
+pub trait BoxedWebHandler {}
 
-impl<T> BoxedHandler for EventHandler<T> {}
+impl<T> BoxedWebHandler for WebHandler<T> {}
 
+// FIXME too many boxing here
 pub fn bind<E: FromWasmAbi>(
-	event: &Event<E>,
+	handler: &Handler<E>,
 	node: &Node,
 	name: &str,
-) -> Result<EventHandler<E>, JsValue>
+) -> Result<WebHandler<E>, JsValue>
 where
 	E: 'static,
 {
-	let event = (*event).clone();
+	let handler = (*handler).clone();
 	let closure = Closure::wrap(Box::new(move |ev: E| {
-		event.trigger(ev);
+		handler.trigger(ev);
 	}) as Box<dyn Fn(_)>);
 	node.add_event_listener_with_callback(name, closure.as_ref().unchecked_ref())?;
-	Ok(EventHandler { _closure: closure })
+	Ok(WebHandler { _closure: closure })
 }

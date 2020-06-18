@@ -11,18 +11,17 @@ use crate::{
 
 use super::{
 	cursor::Cursor,
-	event::BoxedHandler,
+	event::BoxedWebHandler,
 	fragment::{FragmentBuilder, PersistedFragment, SharedPersistedFragment},
 	utils, WebContext,
 };
-use parking_lot::MappedRwLockReadGuard;
 
 #[derive(Clone, Debug)]
 pub struct Web;
 
 pub struct WebState {
 	pub fragment: SharedPersistedFragment,
-	pub handlers: Vec<Box<dyn BoxedHandler>>,
+	pub handlers: Vec<Box<dyn BoxedWebHandler>>,
 }
 
 impl Target for Web {

@@ -47,7 +47,7 @@ where
 }
 
 pub struct ViewInner<T: Target> {
-	pub(crate) spec: ViewDef<T>,
+	pub(crate) def: ViewDef<T>,
 	render_rx: Tracker,
 	pub component: RwLock<Option<Box<dyn Instance<T>>>>,
 	state: RwLock<ViewMut<T>>,
@@ -96,7 +96,7 @@ impl<T: Target> View<T> {
 
 		let view = View {
 			inner: Arc::new(ViewInner {
-				spec,
+				def: spec,
 				component: RwLock::new(None),
 				render_rx: Tracker::new(),
 				state: RwLock::new(state),
@@ -104,7 +104,7 @@ impl<T: Target> View<T> {
 		};
 
 		*view.inner.component.write() =
-			Some(view.inner.spec.element.instance(View::downgrade(&view)));
+			Some(view.inner.def.element.instance(View::downgrade(&view)));
 
 		Tracker::set_eval(
 			&view.inner.render_rx,
@@ -132,7 +132,7 @@ impl<T: Target> View<T> {
 	}
 
 	pub fn element(&self) -> &Element<T> {
-		&self.inner.spec.element
+		&self.inner.def.element
 	}
 
 	pub fn name(&self) -> &'static str {
@@ -140,7 +140,7 @@ impl<T: Target> View<T> {
 	}
 
 	pub fn level(&self) -> usize {
-		self.inner.spec.level
+		self.inner.def.level
 	}
 
 	pub fn downgrade(instance: &View<T>) -> WeakView<T> {
@@ -196,8 +196,8 @@ impl<T: Target> View<T> {
 		arg: Option<T::Arg>,
 	) -> Result<View<T>, T::Error> {
 		let instance = View::new(ViewDef {
-			runtime: self.inner.spec.runtime.clone(),
-			level: self.inner.spec.level + 1,
+			runtime: self.inner.def.runtime.clone(),
+			level: self.inner.def.level + 1,
 			parent: Some(View::downgrade(&self)),
 			element,
 		});
@@ -205,11 +205,11 @@ impl<T: Target> View<T> {
 		Ok(instance)
 	}
 
-	pub(crate) fn render(&self, eval: &mut EvalContext) {
+	pub(crate) fn render(&self, eval: &EvalContext) {
 		let children = self.with_instance(|component| {
 			component.render(&Render {
 				eval,
-				children: &self.inner.spec.element.children(),
+				children: &self.inner.def.element.children(),
 			})
 		});
 
@@ -266,7 +266,7 @@ impl<T: Target> View<T> {
 			self.add_reaction(reaction)
 		}
 
-		if let Some(refr) = self.inner.spec.element.reference() {
+		if let Some(refr) = self.inner.def.element.reference() {
 			refr.apply(View::downgrade(&self))
 		}
 
@@ -314,7 +314,7 @@ impl<T: Target> View<T> {
 
 		self.state_mut().is_render_scheduled = true;
 		self.inner
-			.spec
+			.def
 			.runtime
 			.schedule_render(View::downgrade(&self));
 	}
@@ -326,7 +326,7 @@ impl<T: Target> View<T> {
 
 		self.state_mut().is_update_scheduled = true;
 		self.inner
-			.spec
+			.def
 			.runtime
 			.schedule_update(View::downgrade(&self));
 	}
@@ -362,7 +362,7 @@ impl<T> Evaluation for RenderReaction<T>
 where
 	T: Target,
 {
-	fn eval(&self, ctx: &mut EvalContext) -> u64 {
+	fn eval(&self, ctx: &EvalContext) -> u64 {
 		if let Some(i) = self.instance.upgrade() {
 			i.render(ctx);
 		} else {
@@ -402,7 +402,7 @@ where
 		true
 	}
 
-	fn eval(&self, eval: &mut EvalContext) -> u64 {
+	fn eval(&self, eval: &EvalContext) -> u64 {
 		if let Some(view) = self.view.upgrade() {
 			let mut ctx = Update {
 				eval,

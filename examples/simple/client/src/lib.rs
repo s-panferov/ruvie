@@ -1,5 +1,3 @@
-#![allow(non_snake_case)]
-
 use std::sync::Arc;
 use std::task::Poll;
 
@@ -12,7 +10,7 @@ use rustweb::{
 	contrib::list::{List, ListProps},
 	prelude::*,
 	web::{elem::Div, Class, ClassList, Cursor, Style, Web},
-	Children, Html, Scope, Target,
+	Children, Element, Html, Scope, Target,
 };
 
 use store::AppStore;
@@ -22,12 +20,30 @@ mod api;
 mod error;
 mod store;
 
+fn button<T: Target<Realm = Html>>() -> Children<T> {
+	Children::from(None)
+}
+
 struct App<T>
 where
 	T: Target<Realm = Html>,
 {
 	store: Arc<AppStore>,
 	scope: Scope<Self, T>,
+}
+
+impl<T> App<T>
+where
+	T: Target<Realm = Html>,
+{
+	fn render_list(&mut self) -> Element<T> {
+		List::with_props(ListProps {
+			list: Value::from(self.store.tasks.clone()),
+			hint: Default::default(),
+			item: Arc::new(move |_, task| Div::default().child(task.title.clone()).build()),
+		})
+		.build()
+	}
 }
 
 impl<T: Target<Realm = Html>> Component<T> for App<T> {
@@ -53,14 +69,8 @@ impl<T: Target<Realm = Html>> Component<T> for App<T> {
 					Poll::Pending => String::from("Loading"),
 				}))
 			})
-			.child(
-				List::with_props(ListProps {
-					list: Value::from(store.tasks.clone()),
-					hint: Default::default(),
-					item: Arc::new(move |_, task| Div::default().child(task.title.clone()).build()),
-				})
-				.build(),
-			)
+			.scope(|_| button())
+			.child(self.render_list())
 			.into()
 	}
 }

@@ -1,7 +1,6 @@
-use std::{fmt::Display, sync::Arc};
+use crate::{handler::Handler, props::Prop};
 
-use crate::{event::Event, props::Prop};
-
+use super::class::ClassList;
 use observe::Value;
 use rustcss::StyleSheet;
 use web_sys::{InputEvent, MouseEvent};
@@ -10,7 +9,7 @@ use web_sys::{InputEvent, MouseEvent};
 pub struct Style;
 
 impl Prop for Style {
-	type Value = Value<Option<Arc<StyleSheet>>>;
+	type Value = Value<Option<StyleSheet>>;
 }
 
 #[derive(Hash)]
@@ -19,14 +18,14 @@ pub struct OnClick {
 }
 
 impl Prop for OnClick {
-	type Value = Event<MouseEvent>;
+	type Value = Handler<MouseEvent>;
 }
 
 #[derive(Hash)]
 pub struct OnBeforeInput;
 
 impl Prop for OnBeforeInput {
-	type Value = Event<InputEvent>;
+	type Value = Handler<InputEvent>;
 }
 
 #[derive(Hash)]
@@ -40,7 +39,7 @@ impl Prop for ContentEditable {
 pub struct Class;
 
 impl Prop for Class {
-	type Value = Value<Option<ClassList>>;
+	type Value = Value<ClassList>;
 }
 
 #[derive(Hash)]
@@ -48,30 +47,4 @@ pub struct Id;
 
 impl Prop for Id {
 	type Value = String;
-}
-
-#[derive(Debug, Hash)]
-pub struct ClassList {
-	pub classes: Vec<String>,
-}
-
-impl ClassList {
-	pub fn new(classes: Vec<String>) -> ClassList {
-		ClassList { classes }
-	}
-}
-
-impl From<Vec<String>> for ClassList {
-	fn from(classes: Vec<String>) -> Self {
-		ClassList { classes }
-	}
-}
-
-impl Display for ClassList {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		for cls in &self.classes {
-			write!(f, "{}", cls)?
-		}
-		Ok(())
-	}
 }

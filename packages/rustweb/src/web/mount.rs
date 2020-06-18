@@ -1,6 +1,6 @@
 use web_sys::Document;
 
-use super::{event::BoxedHandler, fragment::FragmentBuilder, Web};
+use super::{event::BoxedWebHandler, fragment::FragmentBuilder, Web};
 
 use crate::context::Mount;
 use std::ops::{Deref, DerefMut};
@@ -8,7 +8,7 @@ use std::ops::{Deref, DerefMut};
 pub struct WebContext {
 	pub doc: Document,
 	pub(crate) fragment: FragmentBuilder,
-	pub(crate) handlers: Vec<Box<dyn BoxedHandler>>,
+	pub(crate) handlers: Vec<Box<dyn BoxedWebHandler>>,
 	pub(crate) mount: Mount<Web>,
 }
 
@@ -26,7 +26,7 @@ impl DerefMut for WebContext {
 }
 
 impl WebContext {
-	pub fn handler(&mut self, handler: Box<dyn BoxedHandler>) {
+	pub fn handler(&mut self, handler: Box<dyn BoxedWebHandler>) {
 		self.handlers.push(handler);
 	}
 }

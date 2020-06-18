@@ -1,7 +1,7 @@
 use wasm_bindgen::JsValue;
 use web_sys::Node;
 
-use super::{Web, WebContext};
+use super::{fragment::ChildPosition, Web, WebContext};
 use crate::view::View;
 use std::hash::Hash;
 
@@ -17,7 +17,9 @@ pub fn mount_children(ctx: &mut WebContext, node: Option<&Node>) -> Result<(), J
 			let state = state.as_mut().unwrap();
 			let child_fragment = &state.fragment;
 			if let Some(node) = node {
-				child_fragment.borrow_mut().insert_self(node, None)?
+				child_fragment
+					.borrow_mut()
+					.insert_self(node, ChildPosition::Append)?
 			} else {
 				ctx.fragment.child(child_fragment.clone())
 			}

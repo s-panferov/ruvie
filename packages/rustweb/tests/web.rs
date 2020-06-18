@@ -9,16 +9,16 @@ use rustweb::{
 	web::{elem::Div, Cursor, Id, Web},
 };
 
-use std::sync::Arc;
+use std::{cell::Cell, rc::Rc, sync::Arc};
 
 use rand::seq::SliceRandom;
-use rand::thread_rng;
+use rand::{thread_rng, Rng};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
 #[derive(Hash, Clone)]
 struct Task {
-	id: u32,
+	id: usize,
 	name: String,
 }
 
@@ -27,7 +27,7 @@ fn list() {
 	let tasks = IndexList::from(indexmap::indexmap! {
 		0 => Task {
 			id: 0,
-			name: "A".to_owned(),
+			name: "0".to_owned(),
 		}
 	});
 
@@ -60,46 +60,23 @@ fn list() {
 
 	assert_eq!(children.length(), 1);
 
+	let mut idx: usize = 1;
+
 	transaction(None, {
 		let tasks = tasks.clone();
 		move |tx| {
 			tasks.modify(Some(tx), |vec| {
 				let mut new_vec = (**vec).clone();
-				new_vec.insert(
-					1,
-					Task {
-						id: 1,
-						name: "B".to_owned(),
-					},
-				);
-				new_vec.insert(
-					2,
-					Task {
-						id: 2,
-						name: "C".to_owned(),
-					},
-				);
-				new_vec.insert(
-					3,
-					Task {
-						id: 3,
-						name: "D".to_owned(),
-					},
-				);
-				new_vec.insert(
-					4,
-					Task {
-						id: 4,
-						name: "E".to_owned(),
-					},
-				);
-				new_vec.insert(
-					5,
-					Task {
-						id: 5,
-						name: "F".to_owned(),
-					},
-				);
+				for _ in 0..5 {
+					new_vec.insert(
+						idx,
+						Task {
+							id: idx,
+							name: idx.to_string(),
+						},
+					);
+					idx += 1;
+				}
 				*vec = Arc::new(new_vec);
 			});
 		}
@@ -124,111 +101,71 @@ fn list() {
 	assert_eq!(children.item(4).unwrap().get_attribute("id").unwrap(), "4");
 	assert_eq!(children.item(5).unwrap().get_attribute("id").unwrap(), "5");
 
-	// transaction(None, {
-	// 	let tasks = tasks.clone();
-	// 	move |tx| {
-	// 		tasks.modify(Some(tx), |vec| {
-	// 			let mut new_vec = (**vec).clone();
-	// 			let item = new_vec.remove(0);
-	// 			new_vec.push(item);
-	// 			*vec = Arc::new(new_vec);
-	// 		});
-	// 	}
-	// });
+	let counter = Rc::new(Cell::new(idx));
 
-	// web_sys::console::log_1(&format!("Tick").into());
-	// rt.tick().unwrap();
+	for _ in 0..100 {
+		transaction(None, {
+			let tasks = tasks.clone();
+			let counter = counter.clone();
+			move |tx| {
+				tasks.modify(Some(tx), |vec| {
+					let mut idx = counter.get().clone();
 
-	// let list = tasks.once();
-	// for task in list.iter() {
-	// 	web_sys::console::log_1(&format!("Expected {}", task.id).into())
-	// }
+					let mut new_vec = (**vec).clone();
+					let mut rng = thread_rng();
 
-	// for (idx, task) in list.iter().enumerate() {
-	// 	assert_eq!(
-	// 		children
-	// 			.item(idx as u32)
-	// 			.unwrap()
-	// 			.get_attribute("id")
-	// 			.unwrap(),
-	// 		task.id.to_string()
-	// 	);
-	// }
+					for _ in 0..3 {
+						new_vec.insert(
+							idx,
+							Task {
+								id: idx,
+								name: idx.to_string(),
+							},
+						);
+						idx += 1;
+					}
 
-	// std::mem::drop(list);
+					for _ in 0..2 {
+						let ridx = rng.gen_range(0, new_vec.len() - 1);
+						new_vec.shift_remove_index(ridx);
+					}
 
-	// transaction(None, {
-	// 	let tasks = tasks.clone();
-	// 	move |tx| {
-	// 		tasks.modify(Some(tx), |vec| {
-	// 			let new_vec = IndexList::from(indexmap::indexmap! {
-	// 				3 => Task {
-	// 					id: 3,
-	// 					name: "D".to_owned(),
-	// 				},
-	// 				1 => Task {
-	// 					id: 1,
-	// 					name: "B".to_owned(),
-	// 				},
-	// 				4 => Task {
-	// 					id: 4,
-	// 					name: "E".to_owned(),
-	// 				},
-	// 				5 => Task {
-	// 					id: 5,
-	// 					name: "F".to_owned(),
-	// 				},
-	// 				2 => Task {
-	// 					id: 2,
-	// 					name: "C".to_owned(),
-	// 				},
-	// 				0 => Task {
-	// 					id: 0,
-	// 					name: "A".to_owned(),
-	// 				}
-	// 			});
-	// 			*vec = Arc::new(new_vec);
-	// 		});
-	// 	}
-	// });
+					let mut keys: Vec<_> = new_vec.keys().cloned().collect();
+					keys.shuffle(&mut rng);
+					let mut map = indexmap::IndexMap::new();
 
-	transaction(None, {
-		let tasks = tasks.clone();
-		move |tx| {
-			tasks.modify(Some(tx), |vec| {
-				let mut keys: Vec<_> = vec.keys().cloned().collect();
-				keys.shuffle(&mut thread_rng());
-				let mut map = indexmap::IndexMap::new();
-				for key in keys {
-					map.insert(key, vec.get(&key).unwrap().clone());
-				}
+					for key in keys {
+						map.insert(key, new_vec.get(&key).unwrap().clone());
+					}
 
-				*vec = Arc::new(map.into());
-			});
+					*vec = Arc::new(map.into());
+
+					counter.set(idx)
+				});
+			}
+		});
+
+		web_sys::console::log_1(&format!("Tick").into());
+
+		let list = tasks.once();
+		for (_, task) in list.iter() {
+			web_sys::console::log_1(&format!("Expected {} {}", task.name, task.id).into())
 		}
-	});
 
-	web_sys::console::log_1(&format!("Tick").into());
+		rt.tick().unwrap();
 
-	let list = tasks.once();
-	for (_, task) in list.iter() {
-		web_sys::console::log_1(&format!("Expected {} {}", task.name, task.id).into())
-	}
-
-	rt.tick().unwrap();
-
-	for (idx, (_, task)) in list.iter().enumerate() {
-		assert_eq!(
-			children
-				.item(idx as u32)
-				.unwrap()
-				.get_attribute("id")
-				.unwrap(),
-			task.id.to_string()
-		);
+		for (idx, (_, task)) in list.iter().enumerate() {
+			assert_eq!(
+				children
+					.item(idx as u32)
+					.unwrap()
+					.get_attribute("id")
+					.unwrap(),
+				task.id.to_string()
+			);
+		}
 	}
 
 	std::mem::drop(view);
-
 	assert_eq!(children.length(), 0);
 }

@@ -1,4 +1,4 @@
-use std::{cell::RefCell, mem::ManuallyDrop, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, mem::ManuallyDrop, rc::Rc};
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{Comment, Document, DocumentFragment, Node, Range};
 
@@ -55,12 +55,10 @@ impl FragmentChild {
 		}
 	}
 
-	fn insert_self(&self, parent: &Node, before: Option<&Node>) -> Result<(), JsValue> {
+	fn insert_self(&self, parent: &Node, pos: ChildPosition) -> Result<(), JsValue> {
 		match self {
-			FragmentChild::Node(node) => {
-				parent.insert_before(&node, before)?;
-			}
-			FragmentChild::Fragment(frag) => frag.borrow_mut().insert_self(parent, before)?,
+			FragmentChild::Node(node) => pos.insert(parent, &node)?,
+			FragmentChild::Fragment(frag) => frag.borrow_mut().insert_self(parent, pos)?,
 		}
 		Ok(())
 	}
@@ -74,7 +72,9 @@ impl FragmentChild {
 				}
 				FragmentChild::Fragment(child) => {
 					let parent = node.parent_node().unwrap();
-					child.borrow_mut().insert_self(&parent, Some(&node))?;
+					child
+						.borrow_mut()
+						.insert_self(&parent, ChildPosition::Before(Cow::Borrowed(&node)))?;
 					parent.remove_child(&node)?;
 				}
 			},
@@ -112,6 +112,28 @@ fn close(name: &Option<&'static str>) -> String {
 
 const MISSING_PARENT: &'static str = "Should have a parent";
 
+pub enum ChildPosition<'a> {
+	Before(Cow<'a, Node>),
+	After(Cow<'a, Node>),
+	Append,
+	Prepend,
+}
+
+impl<'a> ChildPosition<'a> {
+	fn insert(&self, parent: &Node, node: &Node) -> Result<(), JsValue> {
+		match self {
+			ChildPosition::Append => parent.append_child(&node).map(|_| ()),
+			ChildPosition::Prepend => parent
+				.unchecked_ref::<web_sys::Element>()
+				.prepend_with_node_1(&node),
+			ChildPosition::Before(before) => parent.insert_before(&node, Some(&before)).map(|_| ()),
+			ChildPosition::After(after) => parent
+				.insert_before(&node, after.next_sibling().as_ref())
+				.map(|_| ()),
+		}
+	}
+}
+
 impl PersistedFragment {
 	pub fn new(
 		document: Document,
@@ -129,7 +151,7 @@ impl PersistedFragment {
 				name,
 			}
 		} else if children.len() == 1 && !children[0].is_document_fragment() {
-			children[0].insert_self(&parent, None)?;
+			children[0].insert_self(&parent, ChildPosition::Append)?;
 			PersistedFragment {
 				document,
 				attached: true,
@@ -141,7 +163,7 @@ impl PersistedFragment {
 			let comment_end = document.create_comment(&close(&name));
 			parent.append_child(&comment_start)?;
 			for child in &children {
-				child.insert_self(&parent, None)?;
+				child.insert_self(&parent, ChildPosition::Append)?;
 			}
 			parent.append_child(&comment_end)?;
 			PersistedFragment {
@@ -160,8 +182,8 @@ impl PersistedFragment {
 		Ok(range.extract_contents()?.unchecked_into())
 	}
 
-	pub fn insert_self(&mut self, parent: &Node, before: Option<&Node>) -> Result<(), JsValue> {
-		parent.insert_before(&self.extract()?, before)?;
+	pub fn insert_self(&mut self, parent: &Node, pos: ChildPosition) -> Result<(), JsValue> {
+		pos.insert(parent, &self.extract()?)?;
 		Ok(())
 	}
 
@@ -228,12 +250,12 @@ impl PersistedFragment {
 		match &self.kind {
 			FragmentKind::Range(left, _) => {
 				let parent = left.parent_node().expect(MISSING_PARENT);
-				child.insert_self(&parent, Some(&left))?;
+				child.insert_self(&parent, ChildPosition::Before(Cow::Borrowed(&left)))?;
 				self.remove()?
 			}
 			FragmentKind::Empty(comment) => {
 				let parent = comment.parent_node().expect(MISSING_PARENT);
-				child.insert_self(&parent, Some(&comment))?;
+				child.insert_self(&parent, ChildPosition::Before(Cow::Borrowed(&comment)))?;
 				self.remove()?
 			}
 			FragmentKind::Proxy(child) => child.replace_with(child)?,
@@ -252,7 +274,7 @@ impl PersistedFragment {
 		fragment.append_child(&left)?;
 
 		for child in children {
-			child.insert_self(&fragment, None)?;
+			child.insert_self(&fragment, ChildPosition::Append)?;
 		}
 
 		let right = self.document.create_comment(&close(&self.name));
@@ -291,20 +313,23 @@ impl PersistedFragment {
 			match &self.kind {
 				FragmentKind::Range(left, _right) => {
 					let parent = left.parent_node().expect(MISSING_PARENT);
-					children[0].insert_self(&parent, Some(&left))?;
+					children[0]
+						.insert_self(&parent, ChildPosition::Before(Cow::Borrowed(&left)))?;
 					self.remove()?;
 					self.kind = FragmentKind::Proxy(children.remove(0));
 				}
 				FragmentKind::Empty(comment) => {
 					let parent = comment.parent_node().expect(MISSING_PARENT);
-					children[0].insert_self(&parent, Some(&comment))?;
+					children[0]
+						.insert_self(&parent, ChildPosition::Before(Cow::Borrowed(&comment)))?;
 					comment.remove();
 					self.kind = FragmentKind::Proxy(children.remove(0));
 				}
 				FragmentKind::Proxy(child) => {
 					let left = child.left();
 					let parent = left.parent_node().expect(MISSING_PARENT);
-					children[0].insert_self(&parent, Some(&left))?;
+					children[0]
+						.insert_self(&parent, ChildPosition::Before(Cow::Borrowed(&left)))?;
 					child.remove(Some(parent))?;
 					self.kind = FragmentKind::Proxy(children.remove(0))
 				}
@@ -321,7 +346,8 @@ impl PersistedFragment {
 					// FIXME self.parent can be a fragment,
 					//       so maybe it's pointless to crate an intermediate one
 					for child in &children {
-						child.insert_self(&fragment, Some(&left))?;
+						child
+							.insert_self(&fragment, ChildPosition::Before(Cow::Borrowed(&left)))?;
 					}
 					let parent = left.parent_node().expect(MISSING_PARENT);
 					parent.insert_before(&parent, Some(right))?;
@@ -350,21 +376,28 @@ impl PersistedFragment {
 	pub fn insert_child(
 		&mut self,
 		child: FragmentChild,
-		before: Option<Node>,
+		pos: ChildPosition,
 	) -> Result<(), JsValue> {
 		match &self.kind {
 			FragmentKind::Range(left, right) => {
 				let parent = left.parent_node().expect(MISSING_PARENT);
-				match before {
-					Some(before) => child.insert_self(&parent, Some(&before))?,
-					None => child.insert_self(&parent, Some(&right))?,
+				match &pos {
+					ChildPosition::Before(_) => child.insert_self(&parent, pos),
+					ChildPosition::After(_) => child.insert_self(&parent, pos),
+					ChildPosition::Append => {
+						child.insert_self(&parent, ChildPosition::Before(Cow::Borrowed(&right)))
+					}
+					ChildPosition::Prepend => {
+						child.insert_self(&parent, ChildPosition::After(Cow::Borrowed(&left)))
+					}
 				}
 			}
 			FragmentKind::Empty(left) => {
 				let parent = left.parent_node().expect(MISSING_PARENT);
-				child.insert_self(&parent, Some(&left))?;
+				child.insert_self(&parent, ChildPosition::Before(Cow::Borrowed(&left)))?;
 				left.remove();
 				self.kind = FragmentKind::Proxy(child);
+				Ok(())
 			}
 			FragmentKind::Proxy(current) => {
 				let comment_start = self.document.create_comment(&open(&self.name));
@@ -376,12 +409,11 @@ impl PersistedFragment {
 				let parent = left.parent_node().expect(MISSING_PARENT);
 				parent.insert_before(&comment_start, Some(&left))?;
 				parent.insert_before(&comment_end, right.next_sibling().as_ref())?;
-				child.insert_self(&parent, Some(&comment_end))?;
-				self.kind = FragmentKind::Range(comment_start, comment_end)
+				child.insert_self(&parent, ChildPosition::Before(Cow::Borrowed(&comment_end)))?;
+				self.kind = FragmentKind::Range(comment_start, comment_end);
+				Ok(())
 			}
 		}
-
-		Ok(())
 	}
 
 	pub fn move_child(
@@ -393,8 +425,12 @@ impl PersistedFragment {
 			FragmentKind::Range(left, right) => {
 				let parent = left.parent_node().expect(MISSING_PARENT);
 				match before {
-					Some(before) => child.borrow_mut().insert_self(&parent, Some(&before))?,
-					None => child.borrow_mut().insert_self(&parent, Some(&right))?,
+					Some(before) => child
+						.borrow_mut()
+						.insert_self(&parent, ChildPosition::Before(Cow::Borrowed(&before)))?,
+					None => child
+						.borrow_mut()
+						.insert_self(&parent, ChildPosition::Before(Cow::Borrowed(&right)))?,
 				}
 			}
 			FragmentKind::Empty(_left) => unreachable!(),
