@@ -5,7 +5,7 @@ use wasm_bindgen::{prelude::*, JsCast, JsValue};
 
 use observe::{transaction, Computed, MutObservable, Observable, Value, Var};
 
-use rustweb::{
+use ruvie::{
 	context::Render,
 	contrib::list::{List, ListProps},
 	prelude::*,
@@ -145,7 +145,7 @@ pub fn run() -> Result<(), JsValue> {
 	mousemove.forget();
 	click.forget();
 
-	let rt = rustweb::Runtime::new();
+	let rt = ruvie::Runtime::new();
 
 	let view = rt.render(app, Cursor::beginning_of(&body)?)?;
 

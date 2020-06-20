@@ -1,4 +1,4 @@
-use rustcss::StyleSheet;
+use ruvie_css::StyleSheet;
 use std::{borrow::Cow, fmt::Display};
 
 #[derive(Debug, Hash, Clone)]
@@ -76,7 +76,7 @@ macro_rules! cx {
 		let mut list = ClassList::new(vec![]);
 
 		$(
-			rustweb::cx_inner!(list, $class $(=> if $test)* );
+			ruvie::cx_inner!(list, $class $(=> if $test)* );
 		)*
 
 		list

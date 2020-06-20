@@ -1,5 +1,5 @@
 [package]
-name = "rustcss"
+name = "ruvie-css"
 version = "0.1.0"
 authors = ["Stanislav Panferov <stanislav.panferov@revjet.com>"]
 edition = "2018"
@@ -17,6 +17,14 @@ web-sys={ version = "0.3.39", optional=true, features = [
   "Text",
   "Element"
 ] }
+
+[build-dependencies]
+serde = {version="*", features=["derive"]}
+serde_json = "*"
+quote = "1.0.7"
+nom="6.0.0-alpha1"
+Inflector="*"
+proc-macro2="*"
 
 [features]
 default=[]

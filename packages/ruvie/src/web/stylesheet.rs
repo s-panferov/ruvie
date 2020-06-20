@@ -1,5 +1,5 @@
 use harsh::Harsh;
-use rustcss::StyleSheet;
+use ruvie_css::StyleSheet;
 
 use wasm_bindgen::JsCast;
 

@@ -2,7 +2,7 @@ use crate::{handler::Handler, props::Prop};
 
 use super::class::ClassList;
 use observe::Value;
-use rustcss::StyleSheet;
+use ruvie_css::StyleSheet;
 use web_sys::{InputEvent, MouseEvent};
 
 #[derive(Hash)]

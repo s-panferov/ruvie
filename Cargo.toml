@@ -1,8 +1,8 @@
 
 [workspace]
 members = [
-    "packages/rustweb",
-    "packages/rustcss",
+    "packages/ruvie",
+    "packages/ruvie-css",
     "examples/simple/client",
     "examples/simple/server",
 ]

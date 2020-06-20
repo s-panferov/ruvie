@@ -18,6 +18,8 @@ mod target;
 mod test;
 mod view;
 
+pub use ruvie_css;
+
 #[cfg(feature = "web")]
 pub mod web;
 

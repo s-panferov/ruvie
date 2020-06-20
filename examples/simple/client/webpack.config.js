@@ -26,7 +26,8 @@ module.exports = {
       crateDirectory: __dirname,
       // extraArgs: "--out-name index",
       watchDirectories: [
-        path.resolve(__dirname, "..", "..", "packages/rustweb/src"),
+        path.resolve(__dirname, "..", "..", "packages/ruvie/src"),
+        path.resolve(__dirname, "..", "..", "packages/ruvie-css/src"),
       ],
     }),
   ],

@@ -1,5 +1,5 @@
 [package]
-name = "rustweb"
+name = "ruvie"
 version = "0.1.0"
 authors = ["Stanislav Panferov <stanislav.panferov@revjet.com>"]
 edition = "2018"
@@ -12,7 +12,7 @@ edition = "2018"
 [dependencies]
 downcast-rs= "1.1.1"
 observe={path = "../../../observe"}
-rustcss={path = "../rustcss"}
+ruvie-css={path = "../ruvie-css", optional=true}
 snowflake = "1.3.0"
 fxhash="*"
 parking_lot="*"
@@ -43,7 +43,8 @@ web-sys = { version = "0.3.39", optional=true, features = [
 ] }
 
 [features]
-default=["web"]
+default=["web", "css"]
+css = ["ruvie-css"]
 web = ["js-sys", "web-sys", "wasm-bindgen", "console_error_panic_hook"]
 
 [dev-dependencies]

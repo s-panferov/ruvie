@@ -1,5 +1,5 @@
 {
-  "name": "rustweb",
+  "name": "ruview",
   "private": true,
   "workspaces": [
     "examples/simple/client*"

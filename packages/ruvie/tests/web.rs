@@ -3,7 +3,7 @@
 use wasm_bindgen_test::{wasm_bindgen_test, wasm_bindgen_test_configure};
 
 use observe::{transaction, MutObservable, Observable, Value, Var};
-use rustweb::{
+use ruvie::{
 	contrib::list::{IndexList, List, ListProps},
 	prelude::*,
 	web::{elem::Div, Cursor, Id, Web},
@@ -43,7 +43,7 @@ fn list() {
 	})
 	.build();
 
-	let rt = rustweb::Runtime::<Web>::manual();
+	let rt = ruvie::Runtime::<Web>::manual();
 
 	let window = web_sys::window().expect("no global `window` exists");
 	let document = window.document().expect("should have a document on window");
