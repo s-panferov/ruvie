@@ -1,9 +1,9 @@
-pub enum PointerEvent {}
-impl crate::Attribute for PointerEvent {
+pub enum PointerEvents {}
+impl crate::Attribute for PointerEvents {
     const NAME: &'static str = "pointer-events";
 }
 impl crate::StyleSheet {
-    pub fn pointer_events<V: crate::ValueFor<PointerEvent>>(mut self, value: V) -> Self {
+    pub fn pointer_events<V: crate::ValueFor<PointerEvents>>(mut self, value: V) -> Self {
         self.rules.insert("pointer-events", value.value());
         self
     }

@@ -1,5 +1,5 @@
 pub enum PageBreakBefore {
-    Alway,
+    Always,
     Auto,
     Avoid,
     Left,
@@ -10,7 +10,7 @@ pub enum PageBreakBefore {
 impl std::fmt::Display for PageBreakBefore {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PageBreakBefore::Alway => write!(f, "always"),
+            PageBreakBefore::Always => write!(f, "always"),
             PageBreakBefore::Auto => write!(f, "auto"),
             PageBreakBefore::Avoid => write!(f, "avoid"),
             PageBreakBefore::Left => write!(f, "left"),

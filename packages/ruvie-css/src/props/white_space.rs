@@ -1,5 +1,5 @@
 pub enum WhiteSpace {
-    BreakSpace,
+    BreakSpaces,
     Normal,
     Nowrap,
     Pre,
@@ -9,7 +9,7 @@ pub enum WhiteSpace {
 impl std::fmt::Display for WhiteSpace {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            WhiteSpace::BreakSpace => write!(f, "break-spaces"),
+            WhiteSpace::BreakSpaces => write!(f, "break-spaces"),
             WhiteSpace::Normal => write!(f, "normal"),
             WhiteSpace::Nowrap => write!(f, "nowrap"),
             WhiteSpace::Pre => write!(f, "pre"),

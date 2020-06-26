@@ -17,16 +17,16 @@ impl Target for StaticHtml {
 	type State = ();
 
 	fn mount(
-		view: &View<Self>,
+		_view: &View<Self>,
 		ctx: Mount<Self>,
-		arg: Option<()>,
+		_arg: Option<()>,
 	) -> Result<Mount<Self>, Self::Error> {
 		Ok(ctx)
 	}
 
-	fn mount_component(ctx: &mut Self::Mount) -> Result<(), Self::Error> {
+	fn mount_component(_ctx: &mut Self::Mount) -> Result<(), Self::Error> {
 		Ok(())
 	}
 
-	fn schedule_tick(scheduler: &Runtime<Self>) {}
+	fn schedule_tick(_scheduler: &Runtime<Self>) {}
 }

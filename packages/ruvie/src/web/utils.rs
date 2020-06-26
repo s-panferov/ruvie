@@ -32,7 +32,7 @@ pub fn mount_children(ctx: &mut WebContext, node: Option<&Node>) -> Result<(), J
 	Ok(())
 }
 
-pub fn node<K: Hash>(ctx: &View<Web>, r: &K) -> Option<Node> {
+pub fn node<K: Hash>(_ctx: &View<Web>, _r: &K) -> Option<Node> {
 	todo!()
 	// ctx.get(r).and_then(|inst| {
 	// 	inst.state_mut()

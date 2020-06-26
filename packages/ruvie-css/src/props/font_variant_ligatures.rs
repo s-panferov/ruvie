@@ -1,9 +1,9 @@
-pub enum FontVariantLigature {}
-impl crate::Attribute for FontVariantLigature {
+pub enum FontVariantLigatures {}
+impl crate::Attribute for FontVariantLigatures {
     const NAME: &'static str = "font-variant-ligatures";
 }
 impl crate::StyleSheet {
-    pub fn font_variant_ligatures<V: crate::ValueFor<FontVariantLigature>>(
+    pub fn font_variant_ligatures<V: crate::ValueFor<FontVariantLigatures>>(
         mut self,
         value: V,
     ) -> Self {

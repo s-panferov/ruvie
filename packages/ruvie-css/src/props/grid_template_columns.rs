@@ -1,9 +1,9 @@
-pub enum GridTemplateColumn {}
-impl crate::Attribute for GridTemplateColumn {
+pub enum GridTemplateColumns {}
+impl crate::Attribute for GridTemplateColumns {
     const NAME: &'static str = "grid-template-columns";
 }
 impl crate::StyleSheet {
-    pub fn grid_template_columns<V: crate::ValueFor<GridTemplateColumn>>(
+    pub fn grid_template_columns<V: crate::ValueFor<GridTemplateColumns>>(
         mut self,
         value: V,
     ) -> Self {

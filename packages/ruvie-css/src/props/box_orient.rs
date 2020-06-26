@@ -1,17 +1,17 @@
 pub enum BoxOrient {
-    BlockAxi,
+    BlockAxis,
     Horizontal,
     Inherit,
-    InlineAxi,
+    InlineAxis,
     Vertical,
 }
 impl std::fmt::Display for BoxOrient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BoxOrient::BlockAxi => write!(f, "block-axis"),
+            BoxOrient::BlockAxis => write!(f, "block-axis"),
             BoxOrient::Horizontal => write!(f, "horizontal"),
             BoxOrient::Inherit => write!(f, "inherit"),
-            BoxOrient::InlineAxi => write!(f, "inline-axis"),
+            BoxOrient::InlineAxis => write!(f, "inline-axis"),
             BoxOrient::Vertical => write!(f, "vertical"),
         }
     }

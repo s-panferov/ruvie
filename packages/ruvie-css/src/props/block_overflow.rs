@@ -1,12 +1,12 @@
 pub enum BlockOverflow {
     Clip,
-    Ellipsi,
+    Ellipsis,
 }
 impl std::fmt::Display for BlockOverflow {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BlockOverflow::Clip => write!(f, "clip"),
-            BlockOverflow::Ellipsi => write!(f, "ellipsis"),
+            BlockOverflow::Ellipsis => write!(f, "ellipsis"),
         }
     }
 }

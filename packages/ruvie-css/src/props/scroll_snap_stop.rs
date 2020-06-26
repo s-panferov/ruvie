@@ -1,11 +1,11 @@
 pub enum ScrollSnapStop {
-    Alway,
+    Always,
     Normal,
 }
 impl std::fmt::Display for ScrollSnapStop {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ScrollSnapStop::Alway => write!(f, "always"),
+            ScrollSnapStop::Always => write!(f, "always"),
             ScrollSnapStop::Normal => write!(f, "normal"),
         }
     }

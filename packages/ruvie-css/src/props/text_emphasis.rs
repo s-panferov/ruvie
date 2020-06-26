@@ -1,9 +1,9 @@
-pub enum TextEmphasi {}
-impl crate::Attribute for TextEmphasi {
+pub enum TextEmphasis {}
+impl crate::Attribute for TextEmphasis {
     const NAME: &'static str = "text-emphasis";
 }
 impl crate::StyleSheet {
-    pub fn text_emphasis<V: crate::ValueFor<TextEmphasi>>(mut self, value: V) -> Self {
+    pub fn text_emphasis<V: crate::ValueFor<TextEmphasis>>(mut self, value: V) -> Self {
         self.rules.insert("text-emphasis", value.value());
         self
     }

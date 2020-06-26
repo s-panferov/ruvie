@@ -1,9 +1,9 @@
-pub enum BorderStartEndRadiu {}
-impl crate::Attribute for BorderStartEndRadiu {
+pub enum BorderStartEndRadius {}
+impl crate::Attribute for BorderStartEndRadius {
     const NAME: &'static str = "border-start-end-radius";
 }
 impl crate::StyleSheet {
-    pub fn border_start_end_radius<V: crate::ValueFor<BorderStartEndRadiu>>(
+    pub fn border_start_end_radius<V: crate::ValueFor<BorderStartEndRadius>>(
         mut self,
         value: V,
     ) -> Self {

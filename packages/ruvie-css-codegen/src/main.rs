@@ -7,8 +7,7 @@ use std::{
 	process::{Child, Command, Stdio},
 };
 
-use inflector::cases::classcase::to_class_case;
-use inflector::cases::snakecase::to_snake_case;
+use convert_case::{Case, Casing};
 use types::{Syntax, Type};
 
 mod types;
@@ -26,7 +25,7 @@ fn main() -> Result<(), Box<Error>> {
 		.iter()
 		.filter(|(name, _)| !name.starts_with("::") && !name.starts_with("-"))
 	{
-		let mod_name = to_snake_case(&name);
+		let mod_name = name.to_case(Case::Snake);
 		let mut file = std::fs::File::create(format!("../ruvie-css/src/props/{}.rs", mod_name))?;
 
 		writeln!(
@@ -35,7 +34,7 @@ fn main() -> Result<(), Box<Error>> {
 			module = mod_name
 		)?;
 
-		let class_name = to_class_case(&name);
+		let class_name = name.to_case(Case::UpperCamel);
 		let ident = quote::format_ident!("{}", class_name);
 		let func_name = quote::format_ident!("{}", mod_name);
 
@@ -51,13 +50,13 @@ fn main() -> Result<(), Box<Error>> {
 
 		let keywords = kv
 			.iter()
-			.map(|k| quote::format_ident!("{}", to_class_case(k)))
+			.map(|k| quote::format_ident!("{}", k.to_case(Case::UpperCamel)))
 			.collect::<Vec<_>>();
 
 		let formatting = kv
 			.iter()
 			.map(|k| {
-				let name = quote::format_ident!("{}", to_class_case(k));
+				let name = quote::format_ident!("{}", k.to_case(Case::UpperCamel));
 				quote::quote! {
 					#ident::#name => write!(f, #k)
 				}

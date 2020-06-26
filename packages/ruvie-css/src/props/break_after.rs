@@ -1,6 +1,6 @@
 pub enum BreakAfter {
     All,
-    Alway,
+    Always,
     Auto,
     Avoid,
     AvoidColumn,
@@ -18,7 +18,7 @@ impl std::fmt::Display for BreakAfter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BreakAfter::All => write!(f, "all"),
-            BreakAfter::Alway => write!(f, "always"),
+            BreakAfter::Always => write!(f, "always"),
             BreakAfter::Auto => write!(f, "auto"),
             BreakAfter::Avoid => write!(f, "avoid"),
             BreakAfter::AvoidColumn => write!(f, "avoid-column"),

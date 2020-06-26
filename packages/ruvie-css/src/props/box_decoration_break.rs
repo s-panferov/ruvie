@@ -1,12 +1,12 @@
 pub enum BoxDecorationBreak {
     Clone,
-    louse,
+    Slice,
 }
 impl std::fmt::Display for BoxDecorationBreak {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BoxDecorationBreak::Clone => write!(f, "clone"),
-            BoxDecorationBreak::louse => write!(f, "slice"),
+            BoxDecorationBreak::Slice => write!(f, "slice"),
         }
     }
 }

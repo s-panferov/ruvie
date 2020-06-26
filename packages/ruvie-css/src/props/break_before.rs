@@ -1,6 +1,6 @@
 pub enum BreakBefore {
     All,
-    Alway,
+    Always,
     Auto,
     Avoid,
     AvoidColumn,
@@ -18,7 +18,7 @@ impl std::fmt::Display for BreakBefore {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BreakBefore::All => write!(f, "all"),
-            BreakBefore::Alway => write!(f, "always"),
+            BreakBefore::Always => write!(f, "always"),
             BreakBefore::Auto => write!(f, "auto"),
             BreakBefore::Avoid => write!(f, "avoid"),
             BreakBefore::AvoidColumn => write!(f, "avoid-column"),

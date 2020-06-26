@@ -1,23 +1,23 @@
-pub enum Hyphen {
+pub enum Hyphens {
     Auto,
     Manual,
     None,
 }
-impl std::fmt::Display for Hyphen {
+impl std::fmt::Display for Hyphens {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Hyphen::Auto => write!(f, "auto"),
-            Hyphen::Manual => write!(f, "manual"),
-            Hyphen::None => write!(f, "none"),
+            Hyphens::Auto => write!(f, "auto"),
+            Hyphens::Manual => write!(f, "manual"),
+            Hyphens::None => write!(f, "none"),
         }
     }
 }
-impl crate::ValueFor<Hyphen> for Hyphen {}
-impl crate::Attribute for Hyphen {
+impl crate::ValueFor<Hyphens> for Hyphens {}
+impl crate::Attribute for Hyphens {
     const NAME: &'static str = "hyphens";
 }
 impl crate::StyleSheet {
-    pub fn hyphens<V: crate::ValueFor<Hyphen>>(mut self, value: V) -> Self {
+    pub fn hyphens<V: crate::ValueFor<Hyphens>>(mut self, value: V) -> Self {
         self.rules.insert("hyphens", value.value());
         self
     }

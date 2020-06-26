@@ -29,6 +29,8 @@ where
 	T: Target<Realm = Html>,
 {
 	store: Arc<AppStore>,
+
+	#[allow(unused)]
 	scope: Scope<Self, T>,
 }
 

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cell::RefCell, mem::ManuallyDrop, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, rc::Rc};
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{Comment, Document, DocumentFragment, Node, Range};
 

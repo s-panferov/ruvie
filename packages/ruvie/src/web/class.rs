@@ -7,8 +7,6 @@ pub enum ClassItem {
 	StyleSheet(StyleSheet),
 }
 
-struct StyleSheetInject {}
-
 impl Display for ClassItem {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {

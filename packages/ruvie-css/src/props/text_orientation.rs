@@ -1,13 +1,13 @@
 pub enum TextOrientation {
     Mixed,
-    Sideway,
+    Sideways,
     Upright,
 }
 impl std::fmt::Display for TextOrientation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TextOrientation::Mixed => write!(f, "mixed"),
-            TextOrientation::Sideway => write!(f, "sideways"),
+            TextOrientation::Sideways => write!(f, "sideways"),
             TextOrientation::Upright => write!(f, "upright"),
         }
     }

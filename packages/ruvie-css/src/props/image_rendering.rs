@@ -1,13 +1,13 @@
 pub enum ImageRendering {
     Auto,
-    CrispEdge,
+    CrispEdges,
     Pixelated,
 }
 impl std::fmt::Display for ImageRendering {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ImageRendering::Auto => write!(f, "auto"),
-            ImageRendering::CrispEdge => write!(f, "crisp-edges"),
+            ImageRendering::CrispEdges => write!(f, "crisp-edges"),
             ImageRendering::Pixelated => write!(f, "pixelated"),
         }
     }

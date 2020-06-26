@@ -1,9 +1,9 @@
-pub enum BorderTopRightRadiu {}
-impl crate::Attribute for BorderTopRightRadiu {
+pub enum BorderTopRightRadius {}
+impl crate::Attribute for BorderTopRightRadius {
     const NAME: &'static str = "border-top-right-radius";
 }
 impl crate::StyleSheet {
-    pub fn border_top_right_radius<V: crate::ValueFor<BorderTopRightRadiu>>(
+    pub fn border_top_right_radius<V: crate::ValueFor<BorderTopRightRadius>>(
         mut self,
         value: V,
     ) -> Self {

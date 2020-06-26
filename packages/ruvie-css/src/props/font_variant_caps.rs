@@ -1,31 +1,31 @@
-pub enum FontVariantCap {
-    AllPetiteCap,
-    AllSmallCap,
+pub enum FontVariantCaps {
+    AllPetiteCaps,
+    AllSmallCaps,
     Normal,
-    PetiteCap,
-    SmallCap,
-    TitlingCap,
+    PetiteCaps,
+    SmallCaps,
+    TitlingCaps,
     Unicase,
 }
-impl std::fmt::Display for FontVariantCap {
+impl std::fmt::Display for FontVariantCaps {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FontVariantCap::AllPetiteCap => write!(f, "all-petite-caps"),
-            FontVariantCap::AllSmallCap => write!(f, "all-small-caps"),
-            FontVariantCap::Normal => write!(f, "normal"),
-            FontVariantCap::PetiteCap => write!(f, "petite-caps"),
-            FontVariantCap::SmallCap => write!(f, "small-caps"),
-            FontVariantCap::TitlingCap => write!(f, "titling-caps"),
-            FontVariantCap::Unicase => write!(f, "unicase"),
+            FontVariantCaps::AllPetiteCaps => write!(f, "all-petite-caps"),
+            FontVariantCaps::AllSmallCaps => write!(f, "all-small-caps"),
+            FontVariantCaps::Normal => write!(f, "normal"),
+            FontVariantCaps::PetiteCaps => write!(f, "petite-caps"),
+            FontVariantCaps::SmallCaps => write!(f, "small-caps"),
+            FontVariantCaps::TitlingCaps => write!(f, "titling-caps"),
+            FontVariantCaps::Unicase => write!(f, "unicase"),
         }
     }
 }
-impl crate::ValueFor<FontVariantCap> for FontVariantCap {}
-impl crate::Attribute for FontVariantCap {
+impl crate::ValueFor<FontVariantCaps> for FontVariantCaps {}
+impl crate::Attribute for FontVariantCaps {
     const NAME: &'static str = "font-variant-caps";
 }
 impl crate::StyleSheet {
-    pub fn font_variant_caps<V: crate::ValueFor<FontVariantCap>>(mut self, value: V) -> Self {
+    pub fn font_variant_caps<V: crate::ValueFor<FontVariantCaps>>(mut self, value: V) -> Self {
         self.rules.insert("font-variant-caps", value.value());
         self
     }
