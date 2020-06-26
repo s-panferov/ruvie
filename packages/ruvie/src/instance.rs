@@ -21,7 +21,7 @@ pub trait Instance<T: Target>: Downcast {
 		T::mount_component(ctx)
 	}
 
-	fn after_render(&mut self, ctx: &mut AfterRender<T>) {}
+	fn after_render(&mut self, _ctx: &mut AfterRender<T>) {}
 	fn before_unmount(&mut self) {}
 }
 

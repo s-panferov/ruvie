@@ -11,7 +11,7 @@ edition = "2018"
 
 [dependencies]
 downcast-rs= "1.1.1"
-observe={path = "../../../observe"}
+observe={path = "../../../observe/packages/observe"}
 ruvie-css={path = "../ruvie-css", optional=true}
 snowflake = "1.3.0"
 fxhash="*"

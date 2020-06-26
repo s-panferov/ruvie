@@ -1,18 +1,18 @@
 mod global;
-mod length;
-mod percentage;
+mod raw;
 mod rule;
 mod stylesheet;
 
-pub mod color;
 pub mod props;
+pub mod types;
 
-pub use crate::props::PositionType;
+pub use crate::rule::*;
 pub use crate::stylesheet::StyleSheet;
 
 pub mod prelude {
-	pub use crate::length::ToLength;
-	pub use crate::percentage::ToPercentage;
+    pub use crate::types::length::ToLength;
+    pub use crate::types::percentage::ToPercentage;
 }
 
 pub mod macros;
+pub use raw::Raw;

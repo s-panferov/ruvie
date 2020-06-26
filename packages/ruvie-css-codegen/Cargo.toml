@@ -1,0 +1,22 @@
+[package]
+name = "ruvie-css-codegen"
+version = "0.1.0"
+authors = ["Stanislav Panferov <stanislav.panferov@revjet.com>"]
+edition = "2018"
+
+# [lib]
+# crate-type = ["cdylib"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = {version="*", features=["derive"]}
+serde_json = "*"
+quote = "1.0.7"
+Inflector="*"
+proc-macro2="*"
+lalrpop-util = "0.19.0"
+regex = "1"
+
+[build-dependencies]
+lalrpop = {version="0.19.0", features=["lexer"]}

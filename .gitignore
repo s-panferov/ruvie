@@ -3,4 +3,3 @@ pkg
 dist
 Cargo.lock
 node_modules
-/packages/ruvie-css/codegen

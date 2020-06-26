@@ -1,0 +1,3 @@
+[submodule "packages/ruvie-css-codegen/data"]
+	path = packages/ruvie-css-codegen/data
+	url = https://github.com/mdn/data.git

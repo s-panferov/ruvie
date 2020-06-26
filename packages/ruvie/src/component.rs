@@ -3,7 +3,7 @@ use crate::{
 	builder::ElementBuilder,
 	context::{AfterRender, Render},
 	instance::Instance,
-	props::{DynamicProps, PropFor},
+	props::PropFor,
 	scope::Scope,
 	target::Target,
 	Props,
@@ -86,7 +86,7 @@ where
 	where
 		Self: Component<T, Props = Rc<Props<Self>>>,
 	{
-		let mut props = Props::new();
+		let props = Props::new();
 		ElementBuilder::new(Rc::new(props))
 	}
 

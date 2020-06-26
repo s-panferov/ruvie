@@ -8,11 +8,11 @@ struct Button {}
 impl<T: Target<Realm = Html>> Component<T> for Button {
 	type Props = ();
 
-	fn create(props: Self::Props, scope: Scope<Self, T>) -> Self {
+	fn create(_props: Self::Props, _scope: Scope<Self, T>) -> Self {
 		Button {}
 	}
 
-	fn render(&mut self, ctx: &Render<T>) -> Children<T> {
+	fn render(&mut self, _ctx: &Render<T>) -> Children<T> {
 		Div::default().into()
 	}
 }

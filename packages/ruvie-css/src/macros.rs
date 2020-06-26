@@ -1,6 +1,5 @@
 // pub use enclose::*;
 
-
 #[macro_export]
 macro_rules! style2 {
 	($name:ident, |$ctx:ident| $b:block) => {

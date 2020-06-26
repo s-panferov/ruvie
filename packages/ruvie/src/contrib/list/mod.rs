@@ -295,7 +295,7 @@ where
 		self.list.children.insert(key.clone(), child);
 	}
 
-	fn removed(&mut self, key: &K, hint: DiffPositionHint) {
+	fn removed(&mut self, key: &K, _hint: DiffPositionHint) {
 		web_sys::console::log_1(&format!("Removed {:?}", key).into());
 		let child = self.list.children.remove(key);
 		match child {

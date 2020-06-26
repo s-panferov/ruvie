@@ -61,7 +61,7 @@ impl<T: Target<Realm = Html>> Component<T> for App<T> {
 		let payload = store.data.clone();
 
 		Div::<T>::prop(Style, &store.style)
-			.prop(Class, ClassList::from(vec![String::from("test")]))
+			.prop(Class, ruvie::cx!("test"))
 			.scope(move |_ctx| {
 				let payload = payload.clone();
 				Value::from(Computed::new(move |eval| match &*payload.get(eval) {

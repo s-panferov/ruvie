@@ -1,0 +1,60 @@
+use std::str::FromStr;
+
+use crate::types::{Syntax, Alt, Options, Repetition, Type};
+
+grammar;
+
+pub Syntax: Syntax = {
+  <t:Alt> => Syntax::Alt(Box::new(t)),
+  <t:Options> => Syntax::Options(Box::new(t)),
+  <t:Group> => t,
+  <t:Repetition> => Syntax::Repetition(Box::new(t)),
+  <t:Type> => Syntax::Type(t)
+};
+
+Alt: Alt = {
+  <v:(<Type> " | ")+> <e:Type> => {
+    let mut v = v;
+    v.push(e);
+    Alt { variants: v.into_iter().map(|v| Syntax::Type(v)).collect() }
+  }
+}
+
+Options: Options = {
+  <v:(<Type> " || ")+> <e:Type> => {
+    let mut v = v;
+    v.push(e);
+    Options { variants: v.into_iter().map(|v| Syntax::Type(v)).collect() }
+  }
+}
+
+Repetition:Repetition = {
+  <r:Group>"{"<min:Num>","<max:Num>"}" => {
+    Repetition {
+      syntax: r,
+      min: min,
+      max: max
+    }
+  },
+  <t:Type>"{"<min:Num>","<max:Num>"}" => {
+    Repetition {
+      syntax: Syntax::Type(t),
+      min: min,
+      max: max
+    }
+  }
+}
+
+Group:Syntax = {
+  "[" <r:Syntax> "]" => r, 
+}
+
+Type: Type = {
+  "<'" <r:Label> "'>" => Type::Reference(r),
+  "<" <r:Label> ">" => Type::Spec(r),
+  <r:Label>"(" <t:Type> ")" => Type::Parametrized(r, Box::new(t)),
+  <r:Label> => Type::Keyword(r),
+}
+
+Label: String = <s:r"[a-z][a-z0-9-]*"> => s.to_string();
+Num: u32 = <s:r"[0-9]+"> => u32::from_str(s).unwrap();

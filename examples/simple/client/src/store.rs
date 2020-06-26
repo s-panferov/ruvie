@@ -7,10 +7,11 @@ use observe::{
 	Computed, Observable, Var, {EvalContext, Value},
 };
 
-use ruvie_css::{
-	color::{BasicColor, Color},
+use ruvie::css::{
 	prelude::*,
-	PositionType, StyleSheet,
+	props::Position,
+	types::color::{BasicColor, Color},
+	Raw, StyleSheet,
 };
 
 use ruvie::contrib::list::IndexList;
@@ -42,7 +43,7 @@ pub struct Task {
 
 pub struct AppStore {
 	pub props: AppProps,
-	pub style: Computed<Option<Arc<StyleSheet>>>,
+	pub style: Computed<Option<StyleSheet>>,
 	pub data: ComputedFuture<Result<api::TestResponse, HashableError>, WasmBindgen>,
 	pub tasks: Var<Arc<IndexList<usize, Task>>>,
 }
@@ -71,30 +72,27 @@ impl AppStore {
 		x: &Value<i32>,
 		y: &Value<i32>,
 		theme: &Value<Theme>,
-		ev: &mut EvalContext,
-	) -> Option<Arc<StyleSheet>> {
+		ev: &EvalContext,
+	) -> Option<StyleSheet> {
 		let mut style = StyleSheet::new();
 
-		style
-			.height(100.px())
+		style = style
+			.height(Raw::from("100px"))
 			.width(200.px())
-			// .background_color(Rgba)
-			.position(PositionType::Absolute);
+			.position(Position::Relative)
+			.left(x.get(ev).px())
+			.top(y.get(ev).px());
 
 		if *theme.get(ev) == Theme::Square {
-			style.background_color(Color::from(BasicColor::Green));
+			style = style.background_color(Color::from(BasicColor::Green));
 		} else {
-			style.background_color(Color::from(BasicColor::Red));
+			style = style.background_color(Color::from(BasicColor::Red));
 		}
 
-		style.left(x.get(ev).px());
-		style.top(y.get(ev).px());
-		Some(Arc::new(style))
+		Some(style)
 	}
 
-	fn data(
-		_ev: &mut EvalContext,
-	) -> impl Future<Output = Result<api::TestResponse, HashableError>> {
+	fn data(_ev: &EvalContext) -> impl Future<Output = Result<api::TestResponse, HashableError>> {
 		async {
 			let mut url = location();
 			url.set_path("/api/test");

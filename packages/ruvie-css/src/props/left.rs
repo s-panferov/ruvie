@@ -1,14 +1,23 @@
-use crate::global::Auto;
-use crate::length::Length;
-use crate::percentage::Percentage;
-use crate::rule::{Attribute, ValueFor};
-
-pub struct Left;
-
-impl Attribute for Left {
+pub enum Left {
+    Auto,
+}
+impl std::fmt::Display for Left {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Left::Auto => write!(f, "auto"),
+        }
+    }
+}
+impl crate::ValueFor<Left> for Left {}
+impl crate::Attribute for Left {
     const NAME: &'static str = "left";
 }
+impl crate::StyleSheet {
+    pub fn left<V: crate::ValueFor<Left>>(mut self, value: V) -> Self {
+        self.rules.insert("left", value.value());
+        self
+    }
+}
+impl crate::ValueFor<Left> for crate::types::length::Length {}
 
-impl ValueFor<Left> for Length {}
-impl ValueFor<Left> for Percentage {}
-impl ValueFor<Left> for Auto {}
+impl crate::ValueFor<Left> for crate::types::percentage::Percentage {}

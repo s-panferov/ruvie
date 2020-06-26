@@ -1,14 +1,28 @@
-use crate::global::Auto;
-use crate::length::Length;
-use crate::percentage::Percentage;
-use crate::rule::{Attribute, ValueFor};
-
-pub struct Height;
-
-impl ValueFor<Height> for Length {}
-impl ValueFor<Height> for Percentage {}
-impl ValueFor<Height> for Auto {}
-
-impl Attribute for Height {
+pub enum Height {
+    Auto,
+    MaxContent,
+    MinContent,
+}
+impl std::fmt::Display for Height {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Height::Auto => write!(f, "auto"),
+            Height::MaxContent => write!(f, "max-content"),
+            Height::MinContent => write!(f, "min-content"),
+        }
+    }
+}
+impl crate::ValueFor<Height> for Height {}
+impl crate::Attribute for Height {
     const NAME: &'static str = "height";
 }
+impl crate::StyleSheet {
+    pub fn height<V: crate::ValueFor<Height>>(mut self, value: V) -> Self {
+        self.rules.insert("height", value.value());
+        self
+    }
+}
+
+impl crate::ValueFor<Height> for crate::types::length::Length {}
+
+impl crate::ValueFor<Height> for crate::types::percentage::Percentage {}

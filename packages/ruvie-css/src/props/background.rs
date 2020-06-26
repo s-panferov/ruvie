@@ -1,10 +1,10 @@
-use crate::color::Color;
-use crate::rule::{Attribute, ValueFor};
-
-pub struct BackgroundColor;
-
-impl Attribute for BackgroundColor {
-	const NAME: &'static str = "background-color";
+pub enum Background {}
+impl crate::Attribute for Background {
+    const NAME: &'static str = "background";
 }
-
-impl ValueFor<BackgroundColor> for Color {}
+impl crate::StyleSheet {
+    pub fn background<V: crate::ValueFor<Background>>(mut self, value: V) -> Self {
+        self.rules.insert("background", value.value());
+        self
+    }
+}
