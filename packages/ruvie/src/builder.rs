@@ -1,31 +1,28 @@
 use crate::{
-	component::{Component, Lifecycle},
+	component::{Component, Constructor},
 	context::Render,
 	element::TypedElement,
 	func::Func,
 	props::{PropFor, Props},
 	reference::{CompatibleReference, Reference},
-	target::Target,
 	Children, Element,
 };
 
 use std::{hash::Hash, marker::PhantomData, rc::Rc};
 
-pub struct ElementBuilder<C, T>
+pub struct ElementBuilder<C>
 where
-	C: Component<T>,
-	T: Target,
+	C: Component,
 {
 	component: PhantomData<C>,
 	props: C::Props,
-	children: Children<T>,
-	reference: Option<Reference<T>>,
+	children: Children,
+	reference: Option<Reference>,
 }
 
-impl<C, T> ElementBuilder<C, T>
+impl<C> ElementBuilder<C>
 where
-	C: Component<T>,
-	T: Target,
+	C: Component,
 {
 	pub fn new(props: C::Props) -> Self {
 		ElementBuilder {
@@ -36,14 +33,14 @@ where
 		}
 	}
 
-	pub fn with_ref(mut self, refr: impl CompatibleReference<C, T>) -> Self {
+	pub fn with_ref(mut self, refr: impl CompatibleReference<C>) -> Self {
 		self.reference = Some(refr.to_bound_ref());
 		self
 	}
 
 	pub fn prop<P: PropFor<C> + Hash, V: Into<P::Value>>(mut self, prop: P, value: V) -> Self
 	where
-		C: Component<T, Props = Rc<Props<C>>>,
+		C: Component<Props = Rc<Props<C>>>,
 	{
 		let props = Rc::get_mut(&mut self.props).unwrap();
 		props.value_for(prop, value.into());
@@ -52,7 +49,7 @@ where
 
 	pub fn child<IL>(mut self, child: IL) -> Self
 	where
-		IL: Into<Element<T>>,
+		IL: Into<Element>,
 	{
 		let element = child.into();
 		match self.children.as_mut() {
@@ -65,8 +62,8 @@ where
 
 	pub fn scope<FU, IC>(mut self, child: FU) -> Self
 	where
-		FU: Fn(&Render<T>) -> IC + 'static,
-		IC: Into<Children<T>>,
+		FU: Fn(&Render) -> IC + 'static,
+		IC: Into<Children>,
 	{
 		let element = Func::build(move |ctx| child(ctx).into());
 		match self.children.as_mut() {
@@ -76,7 +73,7 @@ where
 		self
 	}
 
-	pub fn children(mut self, mut children: Children<T>) -> Self {
+	pub fn children(mut self, mut children: Children) -> Self {
 		if children.is_none() {
 			return self;
 		}
@@ -89,8 +86,11 @@ where
 		self
 	}
 
-	pub fn build(self) -> Element<T> {
-		Element::from(TypedElement::<C, T> {
+	pub fn build(self) -> Element
+	where
+		C: Constructor,
+	{
+		Element::from(TypedElement::<C> {
 			component: PhantomData,
 			children: self.children,
 			reference: self.reference,
@@ -99,12 +99,11 @@ where
 	}
 }
 
-impl<C, T> From<ElementBuilder<C, T>> for Children<T>
+impl<C> From<ElementBuilder<C>> for Children
 where
-	C: Component<T> + Lifecycle<T>,
-	T: Target,
+	C: Component + Constructor,
 {
-	fn from(builder: ElementBuilder<C, T>) -> Self {
+	fn from(builder: ElementBuilder<C>) -> Self {
 		Children::from(builder.build())
 	}
 }

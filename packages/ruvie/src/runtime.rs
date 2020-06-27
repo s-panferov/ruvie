@@ -1,19 +1,18 @@
 use std::{
+	any::Any,
 	cell::{Ref, RefCell, RefMut},
+	ops::Deref,
 	sync::Arc,
 };
 
 use crate::view::{View, ViewDef, WeakView};
-use crate::{target::Target, Element};
+use crate::{error::RuvieError, target::Target, Element};
 
-pub struct Runtime<T: Target> {
-	body: Arc<RuntimeBody<T>>,
+pub struct Runtime {
+	body: Arc<RuntimeShared>,
 }
 
-impl<T> Clone for Runtime<T>
-where
-	T: Target,
-{
+impl Clone for Runtime {
 	fn clone(&self) -> Self {
 		Runtime {
 			body: self.body.clone(),
@@ -21,19 +20,27 @@ where
 	}
 }
 
-pub struct RuntimeBody<T: Target> {
-	state: RefCell<RuntimeMut<T>>,
+impl Deref for Runtime {
+	type Target = RuntimeShared;
+	fn deref(&self) -> &Self::Target {
+		&self.body
+	}
 }
 
-pub struct RuntimeMut<T: Target> {
-	to_render: Vec<WeakView<T>>,
-	to_update: Vec<WeakView<T>>,
+pub struct RuntimeShared {
+	pub platform: Arc<dyn Target>,
+	state: RefCell<RuntimeMut>,
+}
+
+pub struct RuntimeMut {
+	to_render: Vec<WeakView>,
+	to_update: Vec<WeakView>,
 	tick_scheduled: bool,
 	tick_manually: bool,
 }
 
-impl<T: Target> Runtime<T> {
-	pub fn new() -> Self {
+impl Runtime {
+	pub fn new(platform: Arc<dyn Target>) -> Self {
 		let state = RuntimeMut {
 			to_render: vec![],
 			to_update: vec![],
@@ -42,32 +49,33 @@ impl<T: Target> Runtime<T> {
 		};
 
 		Runtime {
-			body: Arc::new(RuntimeBody {
+			body: Arc::new(RuntimeShared {
+				platform,
 				state: RefCell::new(state),
 			}),
 		}
 	}
 
-	pub fn manual() -> Self {
-		let rt = Self::new();
+	pub fn manual(target: Arc<dyn Target>) -> Self {
+		let rt = Self::new(target);
 		rt.state_mut().tick_manually = true;
 		rt
 	}
 
-	pub(crate) fn state(&self) -> Ref<RuntimeMut<T>> {
+	pub(crate) fn state(&self) -> Ref<RuntimeMut> {
 		self.body.state.borrow()
 	}
 
-	pub(crate) fn state_mut(&self) -> RefMut<RuntimeMut<T>> {
+	pub(crate) fn state_mut(&self) -> RefMut<RuntimeMut> {
 		self.body.state.borrow_mut()
 	}
 
-	pub(crate) fn schedule_render(&self, inst: WeakView<T>) {
+	pub(crate) fn schedule_render(&self, inst: WeakView) {
 		self.state_mut().to_render.push(inst);
 		self.schedule_tick()
 	}
 
-	pub(crate) fn schedule_update(&self, inst: WeakView<T>) {
+	pub(crate) fn schedule_update(&self, inst: WeakView) {
 		self.state_mut().to_update.push(inst);
 		self.schedule_tick()
 	}
@@ -78,10 +86,14 @@ impl<T: Target> Runtime<T> {
 		}
 
 		self.state_mut().tick_scheduled = true;
-		T::schedule_tick(&self)
+		self.body.platform.schedule_tick(&self);
 	}
 
-	pub fn render(&self, element: impl Into<Element<T>>, arg: T::Arg) -> Result<View<T>, T::Error> {
+	pub fn render(
+		&self,
+		element: impl Into<Element>,
+		arg: Box<dyn Any>,
+	) -> Result<View, RuvieError> {
 		let instance = View::new(ViewDef {
 			runtime: self.clone(),
 			level: 0,
@@ -92,7 +104,7 @@ impl<T: Target> Runtime<T> {
 		Ok(instance)
 	}
 
-	pub fn tick(&self) -> Result<(), T::Error> {
+	pub fn tick(&self) -> Result<(), RuvieError> {
 		let mut state = self.state_mut();
 		// FIXME think how to deal with continous updates
 		let to_render = std::mem::replace(&mut state.to_render, vec![]);

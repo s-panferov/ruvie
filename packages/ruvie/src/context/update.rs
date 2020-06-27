@@ -1,10 +1,8 @@
 use observe::EvalContext;
 
-use crate::{target::Target, View};
-use std::marker::PhantomData;
+use crate::View;
 
-pub struct Update<'a, T: Target> {
+pub struct Update<'a> {
 	pub eval: &'a EvalContext,
-	pub view: &'a View<T>,
-	pub(crate) _t: PhantomData<T>,
+	pub view: &'a View,
 }

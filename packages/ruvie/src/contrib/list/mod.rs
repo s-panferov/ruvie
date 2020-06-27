@@ -1,16 +1,17 @@
 use crate::{
-	context::{Render, Update},
-	target::Target,
+	context::{Mount, Render, Update},
 	Children, Component, Element,
 };
 
 #[cfg(feature = "web")]
 use crate::{
-	component::Lifecycle,
+	component::Constructor,
+	error::RuvieError,
 	scope::Scope,
+	web::WebState,
 	web::{
 		fragment::{ChildPosition, FragmentChild},
-		Web, WebContext,
+		WebContext,
 	},
 	View,
 };
@@ -26,6 +27,7 @@ use std::{
 use wasm_bindgen::JsValue;
 
 use std::{
+	any::Any,
 	borrow::Cow,
 	cmp::Ordering::{self},
 };
@@ -88,20 +90,18 @@ impl<K, V> DerefMut for IndexList<K, V> {
 	}
 }
 
-pub struct ListProps<K, V, T>
+pub struct ListProps<K, V>
 where
-	T: Target,
 	K: IndexListKey,
 	V: 'static,
 {
 	pub hint: ListHint,
 	pub list: Value<Arc<IndexList<K, V>>>,
-	pub item: Arc<dyn Fn(&K, &V) -> Element<T>>,
+	pub item: Arc<dyn Fn(&K, &V) -> Element>,
 }
 
-impl<K, V, T> Clone for ListProps<K, V, T>
+impl<K, V> Clone for ListProps<K, V>
 where
-	T: Target,
 	K: IndexListKey,
 	V: 'static,
 {
@@ -114,15 +114,14 @@ where
 	}
 }
 
-pub struct List<K, V, T>
+pub struct List<K, V>
 where
-	T: Target,
 	K: IndexListKey + 'static,
 	V: 'static,
 {
-	store: ListStore<K, V, T>,
-	children: HashMap<K, View<T>>,
-	scope: Scope<Self, T>,
+	store: ListStore<K, V>,
+	children: HashMap<K, View>,
+	scope: Scope<Self>,
 }
 
 #[derive(PartialEq, Clone, Eq)]
@@ -141,19 +140,12 @@ impl Default for ListHint {
 }
 
 #[cfg(feature = "web")]
-impl<K, V, T> Component<T> for List<K, V, T>
+impl<K, V> Constructor for List<K, V>
 where
-	T: Target,
 	K: IndexListKey + 'static,
 	V: 'static,
 {
-	type Props = ListProps<K, V, T>;
-
-	fn name() -> &'static str {
-		"List"
-	}
-
-	fn create(props: Self::Props, scope: Scope<Self, T>) -> Self {
+	fn create(props: Self::Props, scope: Scope<Self>) -> Self {
 		let store = ListStore::new(props);
 		Self {
 			store,
@@ -161,12 +153,25 @@ where
 			children: HashMap::new(),
 		}
 	}
+}
+
+#[cfg(feature = "web")]
+impl<K, V> Component for List<K, V>
+where
+	K: IndexListKey + 'static,
+	V: 'static,
+{
+	type Props = ListProps<K, V>;
+
+	fn name() -> &'static str {
+		"List"
+	}
 
 	fn should_render(&self) -> bool {
 		false
 	}
 
-	fn render(&mut self, _ctx: &Render<T>) -> Children<T> {
+	fn render(&mut self, _ctx: &Render) -> Children {
 		let store = &mut self.store;
 
 		let mut children = vec![];
@@ -179,14 +184,8 @@ where
 		store.prev = list;
 		children.into()
 	}
-}
 
-impl<K, V> Lifecycle<Web> for List<K, V, Web>
-where
-	K: IndexListKey + 'static,
-	V: 'static,
-{
-	fn mount(&mut self, ctx: &mut WebContext) -> Result<(), JsValue> {
+	fn mount(&mut self, ctx: &mut Mount, target: &mut dyn Any) -> Result<(), RuvieError> {
 		if ctx.tree.is_none() {
 			return Ok(());
 		}
@@ -196,12 +195,16 @@ where
 		let children = ctx.tree.take();
 		for ((k, _v), elem) in list.iter().zip(children.unwrap().into_iter()) {
 			let child = ctx.view.render_child(elem, None)?;
-			child.with_state(|state| {
-				let state = state.as_mut().unwrap();
-				let child_fragment = &state.fragment;
-				ctx.fragment.child(child_fragment.clone());
-				Ok::<(), JsValue>(())
-			})?;
+
+			if target.is::<WebContext>() {
+				let target = target.downcast_mut::<WebContext>().unwrap();
+				child.with_state(|state| {
+					let state = state.as_mut().unwrap().downcast_ref::<WebState>().unwrap();
+					let child_fragment = &state.fragment;
+					target.fragment.child(child_fragment.clone());
+					Ok::<(), JsValue>(())
+				})?;
+			}
 
 			self.children.insert(k.clone(), child);
 		}
@@ -209,10 +212,10 @@ where
 		Ok(())
 	}
 
-	fn after_render(&mut self, ctx: &mut crate::context::AfterRender<Web>) {
+	fn after_render(&mut self, ctx: &mut crate::context::AfterRender) {
 		let reaction = self
 			.scope
-			.reaction(move |this: &mut Self, ctx: &mut Update<Web>| {
+			.reaction(move |this: &mut Self, ctx: &mut Update| {
 				let next = this.store.props.list.get(ctx.eval).clone();
 				let hint = this.store.props.hint.clone();
 				let prev = this.store.prev.clone();
@@ -231,6 +234,10 @@ where
 
 		ctx.reaction(reaction);
 	}
+	fn before_unmount(&mut self) {}
+	fn debug(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "View")
+	}
 }
 
 pub struct DiffApply<'a, K, V>
@@ -238,8 +245,8 @@ where
 	K: IndexListKey,
 	V: 'static,
 {
-	view: &'a View<Web>,
-	list: &'a mut List<K, V, Web>,
+	view: &'a View,
+	list: &'a mut List<K, V>,
 	next: &'a IndexList<K, V>,
 }
 
@@ -264,8 +271,11 @@ where
 		let child = self.list.scope.child(element, None).unwrap();
 
 		{
-			let fragment = &self.view.platform().fragment;
-			let child_fragment = &child.platform().fragment;
+			let state = self.view.state();
+			let fragment = &state.downcast_ref::<WebState>().unwrap().fragment;
+
+			let child_state = child.state();
+			let child_fragment = &child_state.downcast_ref::<WebState>().unwrap().fragment;
 
 			let idx = self.next.get_full(key).unwrap().0;
 
@@ -277,7 +287,14 @@ where
 						.next
 						.get_index(idx + 1)
 						.and_then(|r| self.list.children.get(r.0))
-						.map(|v| v.platform().fragment.borrow().left());
+						.map(|v| {
+							v.state()
+								.downcast_ref::<WebState>()
+								.unwrap()
+								.fragment
+								.borrow()
+								.left()
+						});
 
 					match before {
 						Some(node) => ChildPosition::Before(Cow::Owned(node)),
@@ -300,9 +317,12 @@ where
 		let child = self.list.children.remove(key);
 		match child {
 			Some(child) => {
-				let child_fragment = &child.platform().fragment;
+				let child_state = child.state();
+				let child_fragment = &child_state.downcast_ref::<WebState>().unwrap().fragment;
 				self.view
-					.platform()
+					.state()
+					.downcast_ref::<WebState>()
+					.unwrap()
 					.fragment
 					.borrow_mut()
 					.remove_child(&child_fragment)
@@ -320,12 +340,23 @@ where
 			.next
 			.get_index(idx + 1)
 			.and_then(|r| self.list.children.get(r.0))
-			.map(|v| v.platform().fragment.borrow().left());
+			.map(|v| {
+				v.state()
+					.downcast_ref::<WebState>()
+					.unwrap()
+					.fragment
+					.borrow()
+					.left()
+			});
 
 		let child = self.list.children.get(key).unwrap();
-		let child_fragment = &child.platform().fragment;
 
-		let fragment = &self.view.platform().fragment;
+		let child_state = child.state();
+		let child_fragment = &child_state.downcast_ref::<WebState>().unwrap().fragment;
+
+		let state = self.view.state();
+		let fragment = &state.downcast_ref::<WebState>().unwrap().fragment;
+
 		fragment
 			.borrow_mut()
 			.move_child(child_fragment, before)

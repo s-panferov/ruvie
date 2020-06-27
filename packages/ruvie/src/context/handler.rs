@@ -1,6 +1,3 @@
-use std::marker::PhantomData;
-
-pub struct Event<E, T> {
+pub struct Event<E> {
 	pub event: E,
-	pub(crate) _t: PhantomData<T>,
 }

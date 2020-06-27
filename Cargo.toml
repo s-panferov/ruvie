@@ -4,8 +4,8 @@ members = [
     "packages/ruvie",
     "packages/ruvie-css",
     "packages/ruvie-css-codegen",
-    "examples/simple/client",
-    "examples/simple/server",
+    "examples/func",
+    "examples/simple",
 ]
 
 # [profile.release]

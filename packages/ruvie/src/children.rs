@@ -1,74 +1,53 @@
 use std::ops::{Deref, DerefMut};
 
-use crate::{target::Target, Element};
+use crate::Element;
 
 #[derive(Clone)]
-pub struct Children<T>
-where
-	T: Target + ?Sized,
-{
-	children: Option<Vec<Element<T>>>,
+pub struct Children {
+	children: Option<Vec<Element>>,
 }
 
-impl<T> Children<T>
-where
-	T: Target,
-{
-	pub fn take(&mut self) -> Children<T> {
+impl Children {
+	pub fn take(&mut self) -> Children {
 		Children {
 			children: self.children.take(),
 		}
 	}
 
-	pub fn unwrap(self) -> Vec<Element<T>> {
+	pub fn unwrap(self) -> Vec<Element> {
 		self.children.unwrap()
 	}
 }
 
-impl<T> Deref for Children<T>
-where
-	T: Target,
-{
-	type Target = Option<Vec<Element<T>>>;
+impl Deref for Children {
+	type Target = Option<Vec<Element>>;
 	fn deref(&self) -> &Self::Target {
 		&self.children
 	}
 }
 
-impl<T> DerefMut for Children<T>
-where
-	T: Target,
-{
+impl DerefMut for Children {
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		&mut self.children
 	}
 }
 
-impl<T> From<Option<Vec<Element<T>>>> for Children<T>
-where
-	T: Target,
-{
-	fn from(children: Option<Vec<Element<T>>>) -> Self {
+impl From<Option<Vec<Element>>> for Children {
+	fn from(children: Option<Vec<Element>>) -> Self {
 		Children { children }
 	}
 }
 
-impl<T> From<Vec<Element<T>>> for Children<T>
-where
-	T: Target,
-{
-	fn from(children: Vec<Element<T>>) -> Self {
+impl From<Vec<Element>> for Children {
+	fn from(children: Vec<Element>) -> Self {
 		Children {
 			children: Some(children),
 		}
 	}
 }
 
-impl<T> From<Element<T>> for Children<T>
-where
-	T: Target,
-{
-	fn from(children: Element<T>) -> Self {
+impl From<Element> for Children {
+	fn from(children: Element) -> Self {
 		Children {
 			children: Some(vec![children]),
 		}

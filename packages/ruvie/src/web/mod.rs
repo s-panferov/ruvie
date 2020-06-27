@@ -3,6 +3,7 @@ pub use cursor::Cursor;
 pub use mount::WebContext;
 pub use props::*;
 pub use target::Web;
+pub use target::WebState;
 pub use utils::node;
 
 mod class;

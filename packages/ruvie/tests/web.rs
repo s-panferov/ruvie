@@ -43,7 +43,7 @@ fn list() {
 	})
 	.build();
 
-	let rt = ruvie::Runtime::<Web>::manual();
+	let rt = ruvie::Runtime::manual(Arc::new(Web));
 
 	let window = web_sys::window().expect("no global `window` exists");
 	let document = window.document().expect("should have a document on window");
@@ -53,7 +53,7 @@ fn list() {
 	body.append_child(&div).unwrap();
 
 	let view = rt
-		.render(list, Cursor::beginning_of(&div).unwrap())
+		.render(list, Box::new(Cursor::beginning_of(&div).unwrap()))
 		.unwrap();
 
 	let children = div.children();

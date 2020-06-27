@@ -1,8 +1,9 @@
 use std::{
+	any::Any,
 	collections::{HashMap, HashSet},
 	hash::Hash,
-	marker::PhantomData,
 	mem::ManuallyDrop,
+	ops::Deref,
 	sync::{Arc, Weak},
 };
 
@@ -18,26 +19,22 @@ use crate::{
 	context::{AfterRender, Mount, Render, Update},
 	instance::Instance,
 	reference::Reference,
-	target::Target,
 };
 
-use crate::element::Element;
+use crate::{element::Element, error::RuvieError};
 
-pub struct ViewDef<T: Target> {
-	pub runtime: Runtime<T>,
-	pub parent: Option<WeakView<T>>,
-	pub element: Element<T>,
+pub struct ViewDef {
+	pub runtime: Runtime,
+	pub parent: Option<WeakView>,
+	pub element: Element,
 	pub level: usize,
 }
 
-pub struct View<T: Target + ?Sized> {
-	inner: Arc<ViewInner<T>>,
+pub struct View {
+	inner: Arc<ViewShared>,
 }
 
-impl<T> Clone for View<T>
-where
-	T: Target,
-{
+impl Clone for View {
 	fn clone(&self) -> Self {
 		View {
 			inner: self.inner.clone(),
@@ -45,32 +42,36 @@ where
 	}
 }
 
-pub struct ViewInner<T: Target> {
-	pub(crate) def: ViewDef<T>,
-	render_rx: Tracker,
-	pub component: RwLock<Option<Box<dyn Instance<T>>>>,
-	state: RwLock<ViewMut<T>>,
+impl Deref for View {
+	type Target = ViewShared;
+	fn deref(&self) -> &Self::Target {
+		&self.inner
+	}
 }
 
-pub struct ViewMut<T: Target> {
-	rendered_tree: Children<T>,
-	pub children: ManuallyDrop<Vec<View<T>>>,
+pub struct ViewShared {
+	pub(crate) def: ViewDef,
+	render_rx: Tracker,
+	pub component: RwLock<Option<Box<dyn Instance>>>,
+	state: RwLock<ViewMut>,
+}
+
+pub struct ViewMut {
+	rendered_tree: Children,
+	pub children: ManuallyDrop<Vec<View>>,
 	is_render_scheduled: bool,
 	is_update_scheduled: bool,
-	update_res: Result<(), T::Error>,
+	update_res: Result<(), RuvieError>,
 	all_update_reactions: Vec<Tracker>,
 	invalidated_updates: HashSet<WeakTracker>,
-	references: HashMap<u64, WeakView<T>>,
-	pub(crate) target: ManuallyDrop<Option<T::State>>,
+	references: HashMap<u64, WeakView>,
+	pub(crate) target: ManuallyDrop<Option<Box<dyn Any>>>,
 }
 
-pub type ReactionCallback<T> =
-	Box<dyn for<'a> Fn(&'a View<T>, &'a mut Update<'a, T>) -> Result<(), <T as Target>::Error>>;
+pub type ReactionCallback =
+	Box<dyn for<'a> Fn(&'a View, &'a mut Update<'a>) -> Result<(), RuvieError>>;
 
-impl<T> Drop for ViewMut<T>
-where
-	T: Target,
-{
+impl Drop for ViewMut {
 	fn drop(&mut self) {
 		unsafe {
 			let _ = ManuallyDrop::drop(&mut self.target);
@@ -79,8 +80,8 @@ where
 	}
 }
 
-impl<T: Target> View<T> {
-	pub fn new(spec: ViewDef<T>) -> Self {
+impl View {
+	pub fn new(spec: ViewDef) -> Self {
 		let state = ViewMut {
 			children: ManuallyDrop::new(vec![]),
 			rendered_tree: None.into(),
@@ -94,7 +95,7 @@ impl<T: Target> View<T> {
 		};
 
 		let view = View {
-			inner: Arc::new(ViewInner {
+			inner: Arc::new(ViewShared {
 				def: spec,
 				component: RwLock::new(None),
 				render_rx: Tracker::new(),
@@ -118,19 +119,23 @@ impl<T: Target> View<T> {
 		view
 	}
 
-	pub fn component(&self) -> MappedRwLockReadGuard<dyn Instance<T>> {
+	pub fn component(&self) -> MappedRwLockReadGuard<dyn Instance> {
 		RwLockReadGuard::map(self.inner.component.read(), |c| {
 			c.as_ref().unwrap().as_ref()
 		})
 	}
 
-	pub fn component_mut(&self) -> MappedRwLockWriteGuard<dyn Instance<T>> {
+	pub fn component_mut(&self) -> MappedRwLockWriteGuard<dyn Instance> {
 		RwLockWriteGuard::map(self.inner.component.write(), |c| {
 			c.as_mut().unwrap().as_mut()
 		})
 	}
 
-	pub fn element(&self) -> &Element<T> {
+	pub fn def(&self) -> &ViewDef {
+		&self.inner.def
+	}
+
+	pub fn element(&self) -> &Element {
 		&self.inner.def.element
 	}
 
@@ -142,31 +147,32 @@ impl<T: Target> View<T> {
 		self.inner.def.level
 	}
 
-	pub fn downgrade(instance: &View<T>) -> WeakView<T> {
+	pub fn downgrade(instance: &View) -> WeakView {
 		WeakView {
 			inner: Arc::downgrade(&instance.inner),
 		}
 	}
 
-	pub(crate) fn add_child(&self, child: View<T>) {
-		self.state_mut().children.push(child)
+	#[allow(dead_code)]
+	pub(crate) fn add_child(&self, child: View) {
+		self.write().children.push(child)
 	}
 
-	fn state(&self) -> RwLockReadGuard<ViewMut<T>> {
+	fn read(&self) -> RwLockReadGuard<ViewMut> {
 		self.inner.state.read()
 	}
 
-	fn state_mut(&self) -> RwLockWriteGuard<ViewMut<T>> {
+	fn write(&self) -> RwLockWriteGuard<ViewMut> {
 		self.inner.state.write()
 	}
 
-	pub fn platform(&self) -> MappedRwLockReadGuard<T::State> {
+	pub fn state(&self) -> MappedRwLockReadGuard<Box<dyn Any>> {
 		RwLockReadGuard::map(self.inner.state.read(), |state| {
 			state.target.as_ref().unwrap()
 		})
 	}
 
-	pub fn platform_mut(&self) -> MappedRwLockWriteGuard<T::State> {
+	pub fn state_mut(&self) -> MappedRwLockWriteGuard<Box<dyn Any>> {
 		RwLockWriteGuard::map(self.inner.state.write(), |state| {
 			state.target.as_mut().unwrap()
 		})
@@ -174,14 +180,14 @@ impl<T: Target> View<T> {
 
 	pub fn with_state<F, R>(&self, handler: F) -> R
 	where
-		F: FnOnce(&mut Option<T::State>) -> R,
+		F: FnOnce(&mut Option<Box<dyn Any>>) -> R,
 	{
-		(handler)(&mut self.state_mut().target)
+		(handler)(&mut self.write().target)
 	}
 
 	pub fn with_instance<F, R>(&self, handle: F) -> R
 	where
-		F: FnOnce(&mut dyn Instance<T>) -> R,
+		F: FnOnce(&mut dyn Instance) -> R,
 	{
 		let mut component = self.component_mut();
 		let res = (handle)(&mut *component);
@@ -191,9 +197,9 @@ impl<T: Target> View<T> {
 
 	pub fn render_child(
 		&self,
-		element: Element<T>,
-		arg: Option<T::Arg>,
-	) -> Result<View<T>, T::Error> {
+		element: Element,
+		arg: Option<Box<dyn Any>>,
+	) -> Result<View, RuvieError> {
 		let instance = View::new(ViewDef {
 			runtime: self.inner.def.runtime.clone(),
 			level: self.inner.def.level + 1,
@@ -212,19 +218,19 @@ impl<T: Target> View<T> {
 			})
 		});
 
-		self.state_mut().rendered_tree = children;
+		self.write().rendered_tree = children;
 	}
 
-	pub(crate) fn perform_render(&self, arg: Option<T::Arg>) -> Result<(), T::Error> {
+	pub(crate) fn perform_render(&self, arg: Option<Box<dyn Any>>) -> Result<(), RuvieError> {
 		self.inner.render_rx.update();
-		self.state_mut().is_render_scheduled = false;
+		self.write().is_render_scheduled = false;
 		self.mount(arg)?;
 		self.perform_update()?;
 
 		Ok(())
 	}
 
-	fn add_reaction(&self, handler: ReactionCallback<T>) {
+	fn add_reaction(&self, handler: ReactionCallback) {
 		let rx = Tracker::new();
 		Tracker::set_eval(
 			&rx,
@@ -237,30 +243,31 @@ impl<T: Target> View<T> {
 
 		rx.autorun();
 
-		self.state_mut()
+		self.write()
 			.invalidated_updates
 			.insert(Tracker::downgrade(&rx));
 
-		self.state_mut().all_update_reactions.push(rx);
+		self.write().all_update_reactions.push(rx);
 	}
 
-	pub(crate) fn mount(&self, arg: Option<T::Arg>) -> Result<(), T::Error> {
-		let tree = self.state_mut().rendered_tree.take();
-		let ctx = Mount {
+	pub(crate) fn mount(&self, arg: Option<Box<dyn Any>>) -> Result<(), RuvieError> {
+		let tree = self.write().rendered_tree.take();
+		let mut ctx = Mount {
 			view: self.clone(),
 			children: vec![],
 			reactions: vec![],
 			tree,
 		};
 
-		let ctx = T::mount(self, ctx, arg)?;
+		self.inner.def.runtime.platform.mount(self, &mut ctx, arg)?;
+
 		let Mount {
 			children,
 			reactions,
 			..
 		} = ctx;
 
-		self.state_mut().children = ManuallyDrop::new(children);
+		self.write().children = ManuallyDrop::new(children);
 		for reaction in reactions {
 			self.add_reaction(reaction)
 		}
@@ -274,20 +281,20 @@ impl<T: Target> View<T> {
 		Ok(())
 	}
 
-	pub fn reference<K: Hash>(&self, reference: &K) -> Reference<T> {
+	pub fn reference<K: Hash>(&self, reference: &K) -> Reference {
 		Reference {
 			parent: View::downgrade(&self),
 			id: fxhash::hash64(&reference),
 		}
 	}
 
-	pub fn register_reference<K: Hash>(&self, id: &K, inst: WeakView<T>) {
-		self.state_mut().references.insert(fxhash::hash64(id), inst);
+	pub fn register_reference<K: Hash>(&self, id: &K, inst: WeakView) {
+		self.write().references.insert(fxhash::hash64(id), inst);
 	}
 
-	pub(crate) fn perform_update(&self) -> Result<(), T::Error> {
+	pub(crate) fn perform_update(&self) -> Result<(), RuvieError> {
 		let updated = {
-			let mut state = self.state_mut();
+			let mut state = self.write();
 			state.is_update_scheduled = false;
 			std::mem::replace(&mut state.invalidated_updates, HashSet::new())
 		};
@@ -296,7 +303,7 @@ impl<T: Target> View<T> {
 			let rx = rx.upgrade();
 			if let Some(rx) = rx {
 				rx.update();
-				let res = std::mem::replace(&mut self.state_mut().update_res, Ok(()));
+				let res = std::mem::replace(&mut self.write().update_res, Ok(()));
 				if res.is_err() {
 					return res;
 				}
@@ -307,11 +314,11 @@ impl<T: Target> View<T> {
 	}
 
 	pub(crate) fn schedule_render(&self) {
-		if self.state().is_render_scheduled {
+		if self.read().is_render_scheduled {
 			return;
 		}
 
-		self.state_mut().is_render_scheduled = true;
+		self.write().is_render_scheduled = true;
 		self.inner
 			.def
 			.runtime
@@ -319,11 +326,11 @@ impl<T: Target> View<T> {
 	}
 
 	pub(crate) fn schedule_update(&self) {
-		if self.state().is_update_scheduled {
+		if self.read().is_update_scheduled {
 			return;
 		}
 
-		self.state_mut().is_update_scheduled = true;
+		self.write().is_update_scheduled = true;
 		self.inner
 			.def
 			.runtime
@@ -339,28 +346,24 @@ impl<T: Target> View<T> {
 		}
 	}
 
+	#[allow(dead_code)]
 	pub(crate) fn before_unmount(&mut self) {
 		self.component_mut().before_unmount()
 	}
 
-	pub(crate) fn get<K: Hash>(&self, refr: &K) -> Option<View<T>> {
-		let state = self.state();
+	#[allow(dead_code)]
+	pub(crate) fn get<K: Hash>(&self, refr: &K) -> Option<View> {
+		let state = self.read();
 		let res = state.references.get(&fxhash::hash64(refr));
 		res.and_then(|inst| inst.upgrade())
 	}
 }
 
-struct RenderReaction<T>
-where
-	T: Target,
-{
-	instance: WeakView<T>,
+struct RenderReaction {
+	instance: WeakView,
 }
 
-impl<T> Evaluation for RenderReaction<T>
-where
-	T: Target,
-{
+impl Evaluation for RenderReaction {
 	fn eval(&self, ctx: &EvalContext) -> u64 {
 		if let Some(i) = self.instance.upgrade() {
 			i.render(ctx);
@@ -384,32 +387,22 @@ where
 	}
 }
 
-pub struct UpdateReaction<T>
-where
-	T: Target,
-{
-	pub view: WeakView<T>,
+pub struct UpdateReaction {
+	pub view: WeakView,
 	pub rx: WeakTracker,
-	pub handler: Box<dyn for<'a> Fn(&'a View<T>, &'a mut Update<'a, T>) -> Result<(), T::Error>>,
+	pub handler: Box<dyn for<'a> Fn(&'a View, &'a mut Update<'a>) -> Result<(), RuvieError>>,
 }
 
-impl<T> Evaluation for UpdateReaction<T>
-where
-	T: Target,
-{
+impl Evaluation for UpdateReaction {
 	fn is_scheduled(&self) -> bool {
 		true
 	}
 
 	fn eval(&self, eval: &EvalContext) -> u64 {
 		if let Some(view) = self.view.upgrade() {
-			let mut ctx = Update {
-				eval,
-				view: &view,
-				_t: PhantomData,
-			};
+			let mut ctx = Update { eval, view: &view };
 			let res = (self.handler)(&view, &mut ctx);
-			view.state_mut().update_res = res;
+			view.write().update_res = res;
 		} else {
 			unreachable!()
 		}
@@ -419,7 +412,7 @@ where
 	fn on_reaction(&self) {
 		if let Some(view) = self.view.upgrade() {
 			// FIXME move to instance
-			view.state_mut().invalidated_updates.insert(self.rx.clone());
+			view.write().invalidated_updates.insert(self.rx.clone());
 			// FIXME triggers several times, need to optimize in observe
 			view.schedule_update()
 		} else {
@@ -428,26 +421,17 @@ where
 	}
 }
 
-pub struct WeakView<T>
-where
-	T: Target,
-{
-	inner: Weak<ViewInner<T>>,
+pub struct WeakView {
+	inner: Weak<ViewShared>,
 }
 
-impl<T> WeakView<T>
-where
-	T: Target,
-{
-	pub fn upgrade(&self) -> Option<View<T>> {
+impl WeakView {
+	pub fn upgrade(&self) -> Option<View> {
 		self.inner.upgrade().map(|inner| View { inner })
 	}
 }
 
-impl<T> Clone for WeakView<T>
-where
-	T: Target,
-{
+impl Clone for WeakView {
 	fn clone(&self) -> Self {
 		WeakView {
 			inner: self.inner.clone(),

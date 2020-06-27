@@ -1,6 +1,6 @@
 # You must change these to your own details.
 [package]
-name = "simple-client"
+name = "example-func"
 description = "My super awesome Rust, WebAssembly, and Webpack project!"
 version = "0.1.0"
 authors = ["You <you@example.com>"]
@@ -20,9 +20,9 @@ lto = true
 
 [dependencies]
 console_error_panic_hook = "0.1.6"
-ruvie={path="../../../packages/ruvie", features=["web", "css"]}
+ruvie={path="../../packages/ruvie", features=["web", "css"]}
 wasm-bindgen = "0.2.62"
-observe={path = "../../../../observe/packages/observe", features=["wasm-bindgen-futures-0"]}
+observe={path = "../../../observe/packages/observe", features=["wasm-bindgen-futures-0"]}
 maplit= "1.0.2"
 serde={ version = "1.0.106", features = ["derive"] }
 futures= "0.3.4"

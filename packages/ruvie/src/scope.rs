@@ -1,35 +1,33 @@
 use crate::{
 	context::{Event, Update},
+	error::RuvieError,
 	reference::{Reference, TypedReference},
-	target::Target,
 	view::{ReactionCallback, WeakView},
 	Component, Element, Handler, View,
 };
 
-use std::{hash::Hash, marker::PhantomData, sync::Arc};
+use std::{any::Any, hash::Hash, marker::PhantomData, sync::Arc};
 
-pub struct Scope<C, T>
+pub struct Scope<C>
 where
-	C: Component<T>,
-	T: Target,
+	C: Component,
 {
 	_c: PhantomData<C>,
-	view: WeakView<T>,
+	view: WeakView,
 }
 
-impl<C, T> Scope<C, T>
+impl<C> Scope<C>
 where
-	C: Component<T>,
-	T: Target,
+	C: Component,
 {
-	pub(crate) fn new(view: WeakView<T>) -> Self {
+	pub(crate) fn new(view: WeakView) -> Self {
 		Self {
 			_c: PhantomData,
 			view,
 		}
 	}
 
-	pub fn child(&self, element: Element<T>, arg: Option<T::Arg>) -> Result<View<T>, T::Error> {
+	pub fn child(&self, element: Element, arg: Option<Box<dyn Any>>) -> Result<View, RuvieError> {
 		match self.view.upgrade() {
 			Some(view) => view.render_child(element, arg),
 			None => panic!("View was dropped, cannot create a child"),
@@ -37,12 +35,12 @@ where
 	}
 
 	/// Wrap a reaction callback to be run in the context of the component
-	pub fn reaction<F>(&self, handler: F) -> ReactionCallback<T>
+	pub fn reaction<F>(&self, handler: F) -> ReactionCallback
 	where
-		C: Component<T>,
-		F: Fn(&mut C, &mut Update<T>) -> Result<(), T::Error> + 'static,
+		C: Component,
+		F: Fn(&mut C, &mut Update) -> Result<(), RuvieError> + 'static,
 	{
-		Box::new(move |view: &View<T>, ctx: &mut _| {
+		Box::new(move |view: &View, ctx: &mut _| {
 			view.with_instance(|component| {
 				(handler)(component.downcast_mut::<C>().expect("Type"), ctx)
 			})
@@ -50,7 +48,8 @@ where
 	}
 
 	/// Wrap a reference
-	fn reference_for<CH: Component<T>>(&self) -> TypedReference<CH, T> {
+	#[allow(unused)]
+	fn reference_for<CH: Component>(&self) -> TypedReference<CH> {
 		TypedReference {
 			id: fxhash::hash64(&snowflake::ProcessUniqueId::new()),
 			parent: self.view.clone(),
@@ -58,7 +57,7 @@ where
 		}
 	}
 
-	pub fn reference<K: Hash>(&self, reference: &K) -> Reference<T> {
+	pub fn reference<K: Hash>(&self, reference: &K) -> Reference {
 		Reference {
 			parent: self.view.clone(),
 			id: fxhash::hash64(&reference),
@@ -69,7 +68,7 @@ where
 	/// sent to another component as an event handler
 	pub fn handler<F, E>(&self, handler: F) -> Handler<E>
 	where
-		F: Fn(&mut C, Event<E, T>) + 'static,
+		F: Fn(&mut C, Event<E>) + 'static,
 		E: 'static,
 	{
 		let view = self.view.clone();
@@ -78,13 +77,7 @@ where
 			if let Some(view) = view.upgrade() {
 				let handler = handler.clone();
 				view.with_instance(move |component| {
-					handler(
-						component.downcast_mut::<C>().unwrap(),
-						Event {
-							event,
-							_t: PhantomData,
-						},
-					);
+					handler(component.downcast_mut::<C>().unwrap(), Event { event });
 				})
 			}
 		})

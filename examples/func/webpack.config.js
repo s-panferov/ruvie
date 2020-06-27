@@ -21,7 +21,6 @@ module.exports = {
   },
   plugins: [
     new CopyPlugin([path.resolve(__dirname, "static")]),
-
     new WasmPackPlugin({
       crateDirectory: __dirname,
       // extraArgs: "--out-name index",

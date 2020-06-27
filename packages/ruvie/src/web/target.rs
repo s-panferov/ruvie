@@ -1,13 +1,9 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{any::Any, cell::RefCell, rc::Rc};
 
-use wasm_bindgen::{prelude::*, JsCast, JsValue};
+use wasm_bindgen::{prelude::*, JsCast};
 
 use crate::runtime::Runtime;
-use crate::{
-	context::Mount,
-	target::{Html, Target},
-	View,
-};
+use crate::{context::Mount, error::RuvieError, target::Target, View};
 
 use super::{
 	cursor::Cursor,
@@ -25,23 +21,22 @@ pub struct WebState {
 }
 
 impl Target for Web {
-	type Realm = Html;
-
-	type Arg = Cursor;
-	type Mount = WebContext;
-	type Error = JsValue;
-	type State = WebState;
-	type Result = SharedPersistedFragment;
-
-	fn mount_component(ctx: &mut WebContext) -> Result<(), JsValue> {
-		utils::mount_children(ctx, None)
+	fn mount_component(&self, ctx: &mut Mount, target: &mut dyn Any) -> Result<(), RuvieError> {
+		if target.is::<WebContext>() {
+			utils::mount_children(ctx, target.downcast_mut::<WebContext>().unwrap(), None)
+		} else {
+			Ok(()) // FIXME should be an error
+		}
 	}
 
 	fn mount(
-		view: &View<Self>,
-		ctx: Mount<Web>,
-		arg: Option<Cursor>,
-	) -> Result<Mount<Web>, Self::Error> {
+		&self,
+		view: &View,
+		ctx: &mut Mount,
+		arg: Option<Box<dyn Any>>,
+	) -> Result<(), RuvieError> {
+		let cursor = arg.map(|a| a.downcast::<Cursor>().unwrap());
+
 		let window = web_sys::window().expect("no global `window` exists");
 		let document = window.document().expect("should have a document on window");
 
@@ -49,15 +44,13 @@ impl Target for Web {
 			doc: document,
 			fragment: FragmentBuilder::new(),
 			handlers: vec![],
-			mount: ctx,
 		};
 
-		view.with_instance(|component| component.mount(&mut html))?;
+		view.with_instance(|component| component.mount(ctx, &mut html))?;
 
 		let WebContext {
 			fragment,
 			handlers,
-			mount,
 			doc,
 			..
 		} = html;
@@ -67,26 +60,26 @@ impl Target for Web {
 		view.with_state(|state| {
 			if state.is_none() {
 				let fragment = PersistedFragment::new(doc.clone(), Some(name), fragment.children)?;
-				if let Some(cursor) = arg {
+				if let Some(cursor) = cursor {
 					cursor.range.insert_node(&fragment.extract()?)?;
 				}
 
 				let fragment = Rc::new(RefCell::new(fragment));
-				*state = Some(WebState { fragment, handlers })
+				*state = Some(Box::new(WebState { fragment, handlers }))
 			} else {
-				let rt = state.as_mut().unwrap();
+				let rt = state.as_mut().unwrap().downcast_mut::<WebState>().unwrap();
 				rt.fragment
 					.borrow_mut()
 					.replace_children(&doc, fragment.children)?
 			}
 
-			Ok::<(), Self::Error>(())
+			Ok::<(), RuvieError>(())
 		})?;
 
-		Ok(mount)
+		Ok(())
 	}
 
-	fn schedule_tick(runtime: &Runtime<Web>) {
+	fn schedule_tick(&self, runtime: &Runtime) {
 		let runtime = runtime.clone();
 		let callback = Closure::once(move || runtime.tick().unwrap());
 

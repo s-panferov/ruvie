@@ -1,27 +1,25 @@
 use std::{marker::PhantomData, sync::Arc};
 
 use crate::children::Children;
-use crate::component::{Component, Lifecycle};
+use crate::component::{Component, Constructor};
 use crate::reference::Reference;
-use crate::{instance::Instance, scope::Scope, target::Target, view::WeakView};
+use crate::{instance::Instance, scope::Scope, view::WeakView};
 
-pub struct TypedElement<C, T>
+pub struct TypedElement<C>
 where
-	C: Component<T>,
-	T: Target,
+	C: Component,
 {
 	pub(crate) component: PhantomData<C>,
 	pub(crate) props: C::Props,
-	pub(crate) children: Children<T>,
-	pub(crate) reference: Option<Reference<T>>,
+	pub(crate) children: Children,
+	pub(crate) reference: Option<Reference>,
 }
 
-impl<C, T> TypedElement<C, T>
+impl<C> TypedElement<C>
 where
-	C: Component<T>,
-	T: Target,
+	C: Component,
 {
-	pub fn new(props: C::Props, _children: Children<T>) -> Self {
+	pub fn new(props: C::Props, _children: Children) -> Self {
 		Self {
 			component: PhantomData,
 			props: props,
@@ -31,27 +29,20 @@ where
 	}
 }
 
-impl<C, T> From<TypedElement<C, T>> for Children<T>
+impl<C> From<TypedElement<C>> for Children
 where
-	C: Component<T> + Lifecycle<T>,
-	T: Target,
+	C: Component + Constructor,
 {
-	fn from(typed: TypedElement<C, T>) -> Self {
+	fn from(typed: TypedElement<C>) -> Self {
 		Children::from(Element::from(typed))
 	}
 }
 
-pub struct Element<T>
-where
-	T: Target,
-{
-	pub(crate) inner: Arc<dyn ElementFactory<T>>,
+pub struct Element {
+	pub(crate) inner: Arc<dyn ElementFactory>,
 }
 
-impl<T> Clone for Element<T>
-where
-	T: Target,
-{
+impl Clone for Element {
 	fn clone(&self) -> Self {
 		Element {
 			inner: self.inner.clone(),
@@ -59,60 +50,55 @@ where
 	}
 }
 
-impl<T> Element<T>
-where
-	T: Target,
-{
-	pub fn instance(&self, view: WeakView<T>) -> Box<dyn Instance<T>> {
+impl Element {
+	pub fn instance(&self, view: WeakView) -> Box<dyn Instance> {
 		self.inner.instance(view)
 	}
 
-	pub fn children(&self) -> Children<T> {
+	pub fn children(&self) -> Children {
 		self.inner.children()
 	}
 
-	pub fn reference(&self) -> Option<Reference<T>> {
+	pub fn reference(&self) -> Option<Reference> {
 		self.inner.reference()
 	}
 }
 
-impl<C, T> From<TypedElement<C, T>> for Element<T>
+impl<C> From<TypedElement<C>> for Element
 where
-	C: Component<T> + Lifecycle<T>,
-	T: Target,
+	C: Component + Constructor,
 {
-	fn from(el: TypedElement<C, T>) -> Self {
+	fn from(el: TypedElement<C>) -> Self {
 		Element {
 			inner: Arc::new(el),
 		}
 	}
 }
 
-pub trait ElementFactory<T: Target> {
-	fn instance(&self, view: WeakView<T>) -> Box<dyn Instance<T>>;
-	fn children(&self) -> Children<T> {
+pub trait ElementFactory {
+	fn instance(&self, view: WeakView) -> Box<dyn Instance>;
+	fn children(&self) -> Children {
 		Children::from(None)
 	}
 
-	fn reference(&self) -> Option<Reference<T>> {
+	fn reference(&self) -> Option<Reference> {
 		None
 	}
 }
 
-impl<C, T> ElementFactory<T> for TypedElement<C, T>
+impl<C> ElementFactory for TypedElement<C>
 where
-	C: Component<T> + Lifecycle<T> + 'static,
-	T: Target,
+	C: Component + Constructor + 'static,
 {
-	fn instance(&self, view: WeakView<T>) -> Box<dyn Instance<T>> {
+	fn instance(&self, view: WeakView) -> Box<dyn Instance> {
 		Box::new(C::create(self.props.clone(), Scope::new(view)))
 	}
 
-	fn children(&self) -> Children<T> {
+	fn children(&self) -> Children {
 		self.children.clone()
 	}
 
-	fn reference(&self) -> Option<Reference<T>> {
+	fn reference(&self) -> Option<Reference> {
 		self.reference.clone()
 	}
 }

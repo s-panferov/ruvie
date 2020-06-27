@@ -1,13 +1,14 @@
-use std::rc::Rc;
-use wasm_bindgen::{JsCast, JsValue};
+use std::{any::Any, rc::Rc};
+use wasm_bindgen::JsCast;
 use web_sys::Node;
 
-use super::{utils, Web};
+use super::utils;
 use crate::{
-	component::{Component, Lifecycle},
+	component::{Component, Constructor},
+	context::Mount,
+	error::RuvieError,
 	props::PropFor,
 	scope::Scope,
-	target::{Html, Target},
 	Props,
 };
 
@@ -41,58 +42,64 @@ macro_rules! attr {
 	};
 }
 
-pub struct Div<T: Target<Realm = Html>> {
+pub struct Div {
 	props: Rc<Props<Self>>,
-	scope: Scope<Self, T>,
+	scope: Scope<Self>,
 }
 
-impl<T: Target<Realm = Html>> PropFor<Div<T>> for Style {}
-impl<T: Target<Realm = Html>> PropFor<Div<T>> for Class {}
-impl<T: Target<Realm = Html>> PropFor<Div<T>> for ContentEditable {}
-impl<T: Target<Realm = Html>> PropFor<Div<T>> for OnClick {}
-impl<T: Target<Realm = Html>> PropFor<Div<T>> for Id {}
-impl<T: Target<Realm = Html>> PropFor<Div<T>> for OnBeforeInput {}
+impl PropFor<Div> for Style {}
+impl PropFor<Div> for Class {}
+impl PropFor<Div> for ContentEditable {}
+impl PropFor<Div> for OnClick {}
+impl PropFor<Div> for Id {}
+impl PropFor<Div> for OnBeforeInput {}
 
-impl<T: Target<Realm = Html>> Component<T> for Div<T> {
-	type Props = Rc<Props<Self>>;
-	fn create(props: Self::Props, scope: Scope<Self, T>) -> Self {
+impl Constructor for Div {
+	fn create(props: Self::Props, scope: Scope<Self>) -> Self {
 		Div { props, scope }
 	}
 }
 
-impl Lifecycle<Web> for Div<Web> {
-	fn mount(&mut self, ctx: &mut WebContext) -> Result<(), JsValue> {
-		let el = ctx.doc.create_element("div")?;
+impl Component for Div {
+	type Props = Rc<Props<Self>>;
 
-		for prop in &self.props.props {
-			if let Some((_, ev)) = prop.downcast::<OnClick>() {
-				ctx.handler(Box::new(bind(ev, &el, "click")?));
-			} else if let Some((_, ev)) = prop.downcast::<OnBeforeInput>() {
-				ctx.handler(Box::new(bind(ev, &el, "beforeinput")?));
-			}
-		}
+	fn mount(&mut self, ctx: &mut Mount, target: &mut dyn Any) -> Result<(), RuvieError> {
+		if target.is::<WebContext>() {
+			let target = target.downcast_mut::<WebContext>().unwrap();
+			let el = target.doc.create_element("div")?;
 
-		ctx.fragment.child(el.clone().unchecked_into::<Node>());
-		utils::mount_children(ctx, Some(&el))?;
-
-		ctx.reaction(self.scope.reaction({
-			let el = el.clone();
-			move |c: &mut Self, ctx| {
-				for prop in &c.props.props {
-					if let Some((_, style)) = prop.downcast::<Style>() {
-						dynattr!(el, "style", &mut ctx.eval, style);
-					} else if let Some((_, classlist)) = prop.downcast::<Class>() {
-						let list = classlist.get(ctx.eval).to_string();
-						el.set_attribute("class", &list)?;
-					} else if let Some((_, contenteditable)) = prop.downcast::<ContentEditable>() {
-						dynattr!(el, "contenteditable", &mut ctx.eval, contenteditable);
-					} else if let Some((_, id)) = prop.downcast::<Id>() {
-						attr!(el, "id", id);
-					}
+			for prop in &self.props.props {
+				if let Some((_, ev)) = prop.downcast::<OnClick>() {
+					target.handler(Box::new(bind(ev, &el, "click")?));
+				} else if let Some((_, ev)) = prop.downcast::<OnBeforeInput>() {
+					target.handler(Box::new(bind(ev, &el, "beforeinput")?));
 				}
-				Ok(())
 			}
-		}));
+
+			target.fragment.child(el.clone().unchecked_into::<Node>());
+			utils::mount_children(ctx, target, Some(&el))?;
+
+			ctx.reaction(self.scope.reaction({
+				let el = el.clone();
+				move |c: &mut Self, ctx| {
+					for prop in &c.props.props {
+						if let Some((_, style)) = prop.downcast::<Style>() {
+							dynattr!(el, "style", &mut ctx.eval, style);
+						} else if let Some((_, classlist)) = prop.downcast::<Class>() {
+							let list = classlist.get(ctx.eval).to_string();
+							el.set_attribute("class", &list)?;
+						} else if let Some((_, contenteditable)) =
+							prop.downcast::<ContentEditable>()
+						{
+							dynattr!(el, "contenteditable", &mut ctx.eval, contenteditable);
+						} else if let Some((_, id)) = prop.downcast::<Id>() {
+							attr!(el, "id", id);
+						}
+					}
+					Ok(())
+				}
+			}))
+		}
 
 		Ok(())
 	}

@@ -1,17 +1,11 @@
-use crate::{target::Target, view::ReactionCallback};
+use crate::view::ReactionCallback;
 
-pub struct AfterRender<T>
-where
-	T: Target,
-{
-	pub(crate) reactions: Vec<ReactionCallback<T>>,
+pub struct AfterRender {
+	pub(crate) reactions: Vec<ReactionCallback>,
 }
 
-impl<T> AfterRender<T>
-where
-	T: Target,
-{
-	pub fn reaction(&mut self, handler: ReactionCallback<T>) {
+impl AfterRender {
+	pub fn reaction(&mut self, handler: ReactionCallback) {
 		self.reactions.push(handler);
 	}
 }

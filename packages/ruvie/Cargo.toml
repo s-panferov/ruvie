@@ -18,6 +18,8 @@ fxhash="*"
 parking_lot="*"
 indexmap="*"
 harsh={version="*"}
+anyhow="*"
+thiserror="*"
 
 # DOM:
 

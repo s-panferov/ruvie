@@ -1,23 +1,19 @@
-use crate::target::Target;
 use crate::view::{ReactionCallback, View};
 use crate::Children;
 
-pub struct Mount<T: Target + ?Sized> {
-	pub(crate) children: Vec<View<T>>,
-	pub(crate) tree: Children<T>,
-	pub(crate) reactions: Vec<ReactionCallback<T>>,
-	pub(crate) view: View<T>,
+pub struct Mount {
+	pub(crate) children: Vec<View>,
+	pub(crate) tree: Children,
+	pub(crate) reactions: Vec<ReactionCallback>,
+	pub(crate) view: View,
 }
 
-impl<T> Mount<T>
-where
-	T: Target,
-{
-	pub(crate) fn add_child(&mut self, child: View<T>) {
+impl Mount {
+	pub(crate) fn add_child(&mut self, child: View) {
 		self.children.push(child);
 	}
 
-	pub fn reaction(&mut self, handler: ReactionCallback<T>) {
+	pub fn reaction(&mut self, handler: ReactionCallback) {
 		self.reactions.push(handler);
 	}
 }

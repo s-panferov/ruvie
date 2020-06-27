@@ -1,21 +1,23 @@
+use std::{any::Any, hash::Hash, rc::Rc};
+
 use crate::children::Children;
 use crate::{
 	builder::ElementBuilder,
-	context::{AfterRender, Render},
+	context::{AfterRender, Mount, Render},
+	error::RuvieError,
 	instance::Instance,
 	props::PropFor,
 	scope::Scope,
-	target::Target,
 	Props,
 };
 
-use std::{hash::Hash, rc::Rc};
+pub trait Constructor: Component {
+	fn create(props: Self::Props, scope: Scope<Self>) -> Self;
+}
 
 /// Basic system trait all components should implement
-pub trait Component<T: Target>: Sized + 'static {
+pub trait Component: Sized + 'static {
 	type Props: Clone;
-
-	fn create(props: Self::Props, scope: Scope<Self, T>) -> Self;
 
 	/// Defines component name. Useful for debugging.
 	fn name() -> &'static str {
@@ -28,16 +30,11 @@ pub trait Component<T: Target>: Sized + 'static {
 	}
 
 	/// Main function that defines component layout
-	fn render(&mut self, ctx: &Render<T>) -> Children<T> {
+	fn render(&mut self, ctx: &Render) -> Children {
 		ctx.children.clone()
 	}
-}
 
-pub trait Lifecycle<T>
-where
-	T: Target,
-{
-	fn after_render(&mut self, _ctx: &mut AfterRender<T>) {}
+	fn after_render(&mut self, _ctx: &mut AfterRender) {}
 
 	fn before_unmount(&mut self) {}
 
@@ -45,52 +42,40 @@ where
 		write!(f, "View")
 	}
 
-	fn mount(&mut self, ctx: &mut T::Mount) -> Result<(), T::Error> {
-		T::mount_component(ctx)
+	fn mount(&mut self, ctx: &mut Mount, target: &mut dyn Any) -> Result<(), RuvieError> {
+		// FIXME replace .clone() with a Platform::mount_component
+		ctx.view
+			.def()
+			.runtime
+			.platform
+			.clone()
+			.mount_component(ctx, target)
 	}
 }
 
-impl<T, C> Lifecycle<T> for C
-where
-	C: Component<T>,
-	T: Target,
-{
-	default fn after_render(&mut self, _ctx: &mut AfterRender<T>) {}
-	default fn before_unmount(&mut self) {}
-	default fn mount(&mut self, ctx: &mut T::Mount) -> Result<(), T::Error> {
-		T::mount_component(ctx)
-	}
-}
-
-pub trait ComponentExt<T>: Component<T>
-where
-	T: Target,
-{
-	fn with_props(props: Self::Props) -> ElementBuilder<Self, T> {
+pub trait ComponentExt: Component {
+	fn with_props(props: Self::Props) -> ElementBuilder<Self> {
 		ElementBuilder::new(props)
 	}
 
-	fn prop<P: PropFor<Self> + Hash, V: Into<P::Value>>(
-		prop: P,
-		value: V,
-	) -> ElementBuilder<Self, T>
+	fn prop<P: PropFor<Self> + Hash, V: Into<P::Value>>(prop: P, value: V) -> ElementBuilder<Self>
 	where
-		Self: Component<T, Props = Rc<Props<Self>>>,
+		Self: Component<Props = Rc<Props<Self>>>,
 	{
 		let mut props = Props::new();
 		props.value_for(prop, value.into());
 		ElementBuilder::new(Rc::new(props))
 	}
 
-	fn dynamic() -> ElementBuilder<Self, T>
+	fn dynamic() -> ElementBuilder<Self>
 	where
-		Self: Component<T, Props = Rc<Props<Self>>>,
+		Self: Component<Props = Rc<Props<Self>>>,
 	{
 		let props = Props::new();
 		ElementBuilder::new(Rc::new(props))
 	}
 
-	fn default() -> ElementBuilder<Self, T>
+	fn default() -> ElementBuilder<Self>
 	where
 		Self::Props: Default,
 	{
@@ -98,17 +83,11 @@ where
 	}
 }
 
-impl<C, T> ComponentExt<T> for C
-where
-	C: Component<T>,
-	T: Target,
-{
-}
+impl<C> ComponentExt for C where C: Component {}
 
-impl<C, T> Instance<T> for C
+impl<C> Instance for C
 where
-	C: Component<T> + Lifecycle<T>,
-	T: Target,
+	C: Component,
 {
 	fn name(&self) -> &'static str {
 		C::name()
@@ -118,7 +97,7 @@ where
 		C::should_render(self)
 	}
 
-	fn render(&mut self, render: &Render<T>) -> Children<T> {
+	fn render(&mut self, render: &Render) -> Children {
 		C::render(self, render)
 	}
 
@@ -126,11 +105,11 @@ where
 		C::debug(self, f)
 	}
 
-	fn mount(&mut self, ctx: &mut T::Mount) -> Result<(), T::Error> {
-		C::mount(self, ctx)
+	fn mount(&mut self, ctx: &mut Mount, target: &mut dyn Any) -> Result<(), RuvieError> {
+		C::mount(self, ctx, target)
 	}
 
-	fn after_render(&mut self, ctx: &mut AfterRender<T>) {
+	fn after_render(&mut self, ctx: &mut AfterRender) {
 		C::after_render(self, ctx);
 	}
 

@@ -1,14 +1,15 @@
 use downcast_rs::{impl_downcast, Downcast};
 
 use crate::{
-	context::{AfterRender, Render},
-	target::Target,
+	context::{AfterRender, Mount, Render},
+	error::RuvieError,
 	Children,
 };
+use std::any::Any;
 
-pub trait Instance<T: Target>: Downcast {
+pub trait Instance: Downcast {
 	fn name(&self) -> &'static str;
-	fn render(&mut self, eval: &Render<T>) -> Children<T>;
+	fn render(&mut self, eval: &Render) -> Children;
 	fn should_render(&self) -> bool {
 		true
 	}
@@ -17,12 +18,13 @@ pub trait Instance<T: Target>: Downcast {
 		write!(f, "View")
 	}
 
-	fn mount(&mut self, ctx: &mut T::Mount) -> Result<(), T::Error> {
-		T::mount_component(ctx)
+	fn mount(&mut self, ctx: &mut Mount, target: &mut dyn Any) -> Result<(), RuvieError> {
+		let platform = ctx.view.def.runtime.platform.clone();
+		platform.mount_component(ctx, target)
 	}
 
-	fn after_render(&mut self, _ctx: &mut AfterRender<T>) {}
+	fn after_render(&mut self, _ctx: &mut AfterRender) {}
 	fn before_unmount(&mut self) {}
 }
 
-impl_downcast!(Instance<T> where T: Target);
+impl_downcast!(Instance);

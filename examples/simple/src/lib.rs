@@ -10,7 +10,7 @@ use ruvie::{
 	contrib::list::{List, ListProps},
 	prelude::*,
 	web::{elem::Div, Class, ClassList, Cursor, Style, Web},
-	Children, Element, Html, Scope, Target,
+	Children, Element, Scope,
 };
 
 use store::AppStore;
@@ -20,25 +20,19 @@ mod api;
 mod error;
 mod store;
 
-fn button<T: Target<Realm = Html>>() -> Children<T> {
+fn button() -> Children {
 	Children::from(None)
 }
 
-struct App<T>
-where
-	T: Target<Realm = Html>,
-{
+struct App {
 	store: Arc<AppStore>,
 
 	#[allow(unused)]
-	scope: Scope<Self, T>,
+	scope: Scope<Self>,
 }
 
-impl<T> App<T>
-where
-	T: Target<Realm = Html>,
-{
-	fn render_list(&mut self) -> Element<T> {
+impl App {
+	fn render_list(&mut self) -> Element {
 		List::with_props(ListProps {
 			list: Value::from(self.store.tasks.clone()),
 			hint: Default::default(),
@@ -48,21 +42,21 @@ where
 	}
 }
 
-impl<T: Target<Realm = Html>> Component<T> for App<T> {
+impl Component for App {
 	type Props = Arc<AppStore>;
 
-	fn create(props: Self::Props, scope: Scope<Self, T>) -> Self {
+	fn create(props: Self::Props, scope: Scope<Self>) -> Self {
 		App {
 			store: props,
 			scope,
 		}
 	}
 
-	fn render(&mut self, _ctx: &Render<T>) -> Children<T> {
+	fn render(&mut self, _ctx: &Render) -> Children {
 		let store = &self.store;
 		let payload = store.data.clone();
 
-		Div::<T>::prop(Style, &store.style)
+		Div::prop(Style, &store.style)
 			.prop(Class, ruvie::cx!("test"))
 			.scope(move |_ctx| {
 				let payload = payload.clone();
@@ -91,7 +85,7 @@ pub fn run() -> Result<(), JsValue> {
 		y: y.clone().into(),
 	});
 
-	let app = App::<Web>::with_props(store.clone()).build();
+	let app = App::with_props(store.clone()).build();
 	let window = web_sys::window().expect("no global `window` exists");
 	let document = window.document().expect("should have a document on window");
 	let body = document.body().expect("document should have a body");
@@ -147,9 +141,9 @@ pub fn run() -> Result<(), JsValue> {
 	mousemove.forget();
 	click.forget();
 
-	let rt = ruvie::Runtime::new();
+	let rt = ruvie::Runtime::new(Arc::new(Web));
 
-	let view = rt.render(app, Cursor::beginning_of(&body)?)?;
+	let view = rt.render(app, Box::new(Cursor::beginning_of(&body)?));
 
 	Box::leak(Box::new(view));
 

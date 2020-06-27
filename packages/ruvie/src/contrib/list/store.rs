@@ -1,23 +1,20 @@
 use super::{IndexList, IndexListKey, ListProps};
-use crate::target::Target;
 use std::sync::Arc;
 
-pub struct ListStore<K, V, T>
+pub struct ListStore<K, V>
 where
 	K: IndexListKey,
 	V: 'static,
-	T: Target,
 {
-	pub props: ListProps<K, V, T>,
+	pub props: ListProps<K, V>,
 	pub prev: Arc<IndexList<K, V>>,
 }
 
-impl<K, V, T> ListStore<K, V, T>
+impl<K, V> ListStore<K, V>
 where
 	K: IndexListKey,
-	T: Target,
 {
-	pub fn new(props: ListProps<K, V, T>) -> Self {
+	pub fn new(props: ListProps<K, V>) -> Self {
 		Self {
 			props,
 			prev: Arc::new(IndexList::new()),

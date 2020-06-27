@@ -48,6 +48,7 @@ impl FragmentChild {
 		}
 	}
 
+	#[allow(unused)]
 	fn extract_contents(&self) -> Result<Node, JsValue> {
 		match self {
 			FragmentChild::Fragment(frag) => frag.borrow().extract(),

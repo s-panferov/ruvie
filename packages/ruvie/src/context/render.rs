@@ -1,14 +1,8 @@
 use observe::EvalContext;
 
 use crate::children::Children;
-use crate::target::Target;
 
-pub struct Render<'a, T>
-where
-	T: Target,
-{
+pub struct Render<'a> {
 	pub eval: &'a EvalContext,
-	pub children: &'a Children<T>,
+	pub children: &'a Children,
 }
-
-// impl<'a, T> Render<'a, T> where T: Target {}

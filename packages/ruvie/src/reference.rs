@@ -1,20 +1,18 @@
-use crate::{target::Target, view::WeakView, Component};
+use crate::{view::WeakView, Component};
 use std::marker::PhantomData;
 
-pub struct TypedReference<C, T>
+pub struct TypedReference<C>
 where
-	C: Component<T>,
-	T: Target,
+	C: Component,
 {
 	pub id: u64,
-	pub parent: WeakView<T>,
+	pub parent: WeakView,
 	pub _c: PhantomData<C>,
 }
 
-impl<C, T> Clone for TypedReference<C, T>
+impl<C> Clone for TypedReference<C>
 where
-	C: Component<T>,
-	T: Target,
+	C: Component,
 {
 	fn clone(&self) -> Self {
 		TypedReference {
@@ -25,12 +23,11 @@ where
 	}
 }
 
-impl<C, T> From<TypedReference<C, T>> for Reference<T>
+impl<C> From<TypedReference<C>> for Reference
 where
-	C: Component<T>,
-	T: Target,
+	C: Component,
 {
-	fn from(v: TypedReference<C, T>) -> Self {
+	fn from(v: TypedReference<C>) -> Self {
 		Reference {
 			parent: v.parent,
 			id: v.id,
@@ -39,46 +36,40 @@ where
 }
 
 #[derive(Clone)]
-pub struct Reference<T: Target> {
-	pub parent: WeakView<T>,
+pub struct Reference {
+	pub parent: WeakView,
 	pub id: u64,
 }
 
-impl<T> Reference<T>
-where
-	T: Target,
-{
-	pub fn apply(&self, inst: WeakView<T>) {
+impl Reference {
+	pub fn apply(&self, inst: WeakView) {
 		if let Some(parent) = self.parent.upgrade() {
 			parent.register_reference(&self.id, inst)
 		}
 	}
 }
 
-pub trait CompatibleReference<C, T>
+pub trait CompatibleReference<C>
 where
-	C: Component<T>,
-	T: Target,
+	C: Component,
 {
-	fn to_bound_ref(self) -> Reference<T>;
+	fn to_bound_ref(self) -> Reference;
 }
 
-impl<C, T> CompatibleReference<C, T> for Reference<T>
+impl<C> CompatibleReference<C> for Reference
 where
-	C: Component<T>,
-	T: Target,
+	C: Component,
 {
-	fn to_bound_ref(self) -> Reference<T> {
+	fn to_bound_ref(self) -> Reference {
 		self
 	}
 }
 
-impl<C, T> CompatibleReference<C, T> for TypedReference<C, T>
+impl<C> CompatibleReference<C> for TypedReference<C>
 where
-	C: Component<T>,
-	T: Target,
+	C: Component,
 {
-	fn to_bound_ref(self) -> Reference<T> {
+	fn to_bound_ref(self) -> Reference {
 		self.into()
 	}
 }

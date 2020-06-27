@@ -1,80 +1,76 @@
 use observe::{Const, Observable, Value};
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::JsCast;
 use web_sys::Node;
 
-use super::{Web, WebContext};
+use super::WebContext;
 use crate::element::TypedElement;
 use crate::{
-	component::Lifecycle,
-	scope::Scope,
-	target::{Html, Target},
-	Children, Component, Element,
+	component::Constructor, context::Mount, error::RuvieError, scope::Scope, Children, Component,
+	Element,
 };
+use std::any::Any;
 
-pub struct Text<T>
-where
-	T: Target<Realm = Html>,
-{
+pub struct Text {
 	props: Value<String>,
-	scope: Scope<Self, T>,
+	scope: Scope<Self>,
 }
 
-impl<T> Component<T> for Text<T>
-where
-	T: Target<Realm = Html>,
-{
-	type Props = Value<String>;
-
-	fn create(props: Self::Props, scope: Scope<Self, T>) -> Self {
+impl Constructor for Text {
+	fn create(props: Self::Props, scope: Scope<Self>) -> Self {
 		Text { props, scope }
 	}
 }
 
-impl Lifecycle<Web> for Text<Web> {
-	fn mount(&mut self, ctx: &mut WebContext) -> Result<(), JsValue> {
-		let el = ctx.doc.create_text_node("EMPTY");
-		ctx.fragment.child(el.clone().unchecked_into::<Node>());
-		ctx.reaction(self.scope.reaction(move |this, ctx| {
-			el.set_data(&this.props.get(ctx.eval));
-			Ok(())
-		}));
+impl Component for Text {
+	type Props = Value<String>;
+
+	fn mount(&mut self, ctx: &mut Mount, target: &mut dyn Any) -> Result<(), RuvieError> {
+		if target.is::<WebContext>() {
+			let target = target.downcast_mut::<WebContext>().unwrap();
+			let el = target.doc.create_text_node("EMPTY");
+			target.fragment.child(el.clone().unchecked_into::<Node>());
+			ctx.reaction(self.scope.reaction(move |this, ctx| {
+				el.set_data(&this.props.get(ctx.eval));
+				Ok(())
+			}));
+		}
 
 		Ok(())
 	}
 }
 
-impl<T: Target<Realm = Html>> From<String> for Element<T> {
+impl From<String> for Element {
 	fn from(value: String) -> Self {
-		Element::<T>::from(TypedElement::<Text<T>, T>::new(
+		Element::from(TypedElement::<Text>::new(
 			Const::new(value).into(),
 			Children::from(None),
 		))
 	}
 }
 
-impl<T: Target<Realm = Html>> From<&str> for Element<T> {
+impl From<&str> for Element {
 	fn from(value: &str) -> Self {
-		Element::<T>::from(TypedElement::<Text<T>, T>::new(
+		Element::from(TypedElement::<Text>::new(
 			Const::new(value.to_owned()).into(),
 			Children::from(None),
 		))
 	}
 }
 
-impl<T: Target<Realm = Html>> From<Value<String>> for Children<T> {
+impl From<Value<String>> for Children {
 	fn from(value: Value<String>) -> Self {
-		Children::from(TypedElement::<Text<T>, T>::new(value, Children::from(None)))
+		Children::from(TypedElement::<Text>::new(value, Children::from(None)))
 	}
 }
 
-impl<T: Target<Realm = Html>> From<String> for Children<T> {
+impl From<String> for Children {
 	fn from(value: String) -> Self {
-		Children::<T>::from(Element::from(value))
+		Children::from(Element::from(value))
 	}
 }
 
-impl<T: Target<Realm = Html>> From<&str> for Children<T> {
+impl From<&str> for Children {
 	fn from(value: &str) -> Self {
-		Children::<T>::from(Element::from(value))
+		Children::from(Element::from(value))
 	}
 }
