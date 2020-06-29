@@ -143,7 +143,7 @@ pub fn run() -> Result<(), JsValue> {
 	mousemove.forget();
 	click.forget();
 
-	let rt = ruvie::Runtime::new(Arc::new(Web));
+	let rt = ruvie::Runtime::new(Web);
 
 	let view = rt.render(app, Box::new(Cursor::beginning_of(&body)?));
 

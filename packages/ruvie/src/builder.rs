@@ -115,6 +115,12 @@ where
 	}
 }
 
+impl<C: Component> From<ElementBuilder<C>> for Element {
+	fn from(el: ElementBuilder<C>) -> Self {
+		el.build()
+	}
+}
+
 impl<C> From<ElementBuilder<C>> for Children
 where
 	C: Component,

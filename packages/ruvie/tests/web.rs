@@ -43,7 +43,7 @@ fn list() {
 	})
 	.build();
 
-	let rt = ruvie::Runtime::manual(Arc::new(Web));
+	let rt = ruvie::Runtime::manual(Web);
 
 	let window = web_sys::window().expect("no global `window` exists");
 	let document = window.document().expect("should have a document on window");

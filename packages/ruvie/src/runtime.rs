@@ -12,6 +12,13 @@ pub struct Runtime {
 	body: Arc<RuntimeShared>,
 }
 
+pub struct RuntimeMut {
+	to_render: Vec<WeakView>,
+	to_update: Vec<WeakView>,
+	tick_scheduled: bool,
+	tick_manually: bool,
+}
+
 impl Clone for Runtime {
 	fn clone(&self) -> Self {
 		Runtime {
@@ -32,15 +39,8 @@ pub struct RuntimeShared {
 	state: RefCell<RuntimeMut>,
 }
 
-pub struct RuntimeMut {
-	to_render: Vec<WeakView>,
-	to_update: Vec<WeakView>,
-	tick_scheduled: bool,
-	tick_manually: bool,
-}
-
 impl Runtime {
-	pub fn new(platform: Arc<dyn Target>) -> Self {
+	pub fn new<T: Target>(platform: T) -> Self {
 		let state = RuntimeMut {
 			to_render: vec![],
 			to_update: vec![],
@@ -50,13 +50,13 @@ impl Runtime {
 
 		Runtime {
 			body: Arc::new(RuntimeShared {
-				platform,
+				platform: Arc::new(platform),
 				state: RefCell::new(state),
 			}),
 		}
 	}
 
-	pub fn manual(target: Arc<dyn Target>) -> Self {
+	pub fn manual<T: Target>(target: T) -> Self {
 		let rt = Self::new(target);
 		rt.state_mut().tick_manually = true;
 		rt
