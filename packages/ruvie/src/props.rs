@@ -123,7 +123,3 @@ impl<C> Default for Props<C> {
 		}
 	}
 }
-
-pub trait DynamicProps<O>: Sized {
-	fn prop<P: PropFor<Self> + Hash, V: Into<P::Value>>(prop: P, value: V) -> O;
-}

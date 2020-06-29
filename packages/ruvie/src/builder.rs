@@ -5,16 +5,28 @@ use crate::{
 	func::Func,
 	props::{PropFor, Props},
 	reference::{CompatibleReference, Reference},
-	Children, Element,
+	Children, Element, Scope,
 };
 
 use std::{hash::Hash, marker::PhantomData, rc::Rc};
+
+pub trait Factory<C: Component> {
+	fn create(&self, props: C::Props, scope: Scope<C>) -> C;
+}
+
+impl<C: Constructor> Factory<C> for PhantomData<C> {
+	fn create(&self, props: C::Props, scope: Scope<C>) -> C {
+		C::create(props, scope)
+	}
+}
+
+pub type DynFactory<C> = Box<dyn Factory<C>>;
 
 pub struct ElementBuilder<C>
 where
 	C: Component,
 {
-	component: PhantomData<C>,
+	factory: DynFactory<C>,
 	props: C::Props,
 	children: Children,
 	reference: Option<Reference>,
@@ -24,9 +36,9 @@ impl<C> ElementBuilder<C>
 where
 	C: Component,
 {
-	pub fn new(props: C::Props) -> Self {
+	pub fn new(factory: DynFactory<C>, props: C::Props) -> Self {
 		ElementBuilder {
-			component: PhantomData,
+			factory,
 			props,
 			children: None.into(),
 			reference: None,
@@ -65,7 +77,14 @@ where
 		FU: Fn(&Render) -> IC + 'static,
 		IC: Into<Children>,
 	{
-		let element = Func::build(move |ctx| child(ctx).into());
+		let func = Func::new(move |ctx| child(ctx).into());
+		let element = Element::from(TypedElement {
+			factory: Box::new(func),
+			children: None.into(),
+			reference: None,
+			props: (),
+		});
+
 		match self.children.as_mut() {
 			Some(children) => children.push(element),
 			None => self.children = Children::from(element),
@@ -86,12 +105,9 @@ where
 		self
 	}
 
-	pub fn build(self) -> Element
-	where
-		C: Constructor,
-	{
+	pub fn build(self) -> Element {
 		Element::from(TypedElement::<C> {
-			component: PhantomData,
+			factory: self.factory,
 			children: self.children,
 			reference: self.reference,
 			props: self.props,
@@ -101,7 +117,7 @@ where
 
 impl<C> From<ElementBuilder<C>> for Children
 where
-	C: Component + Constructor,
+	C: Component,
 {
 	fn from(builder: ElementBuilder<C>) -> Self {
 		Children::from(builder.build())

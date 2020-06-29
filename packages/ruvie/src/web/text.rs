@@ -16,7 +16,7 @@ pub struct Text {
 }
 
 impl Constructor for Text {
-	fn create(props: Self::Props, scope: Scope<Self>) -> Self {
+	fn create(props: <Self as Component>::Props, scope: Scope<Self>) -> Self {
 		Text { props, scope }
 	}
 }

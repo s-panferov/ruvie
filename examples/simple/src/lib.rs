@@ -10,7 +10,7 @@ use ruvie::{
 	contrib::list::{List, ListProps},
 	prelude::*,
 	web::{elem::Div, Class, ClassList, Cursor, Style, Web},
-	Children, Element, Scope,
+	Children, Component, Constructor, Element, Scope,
 };
 
 use store::AppStore;
@@ -42,15 +42,17 @@ impl App {
 	}
 }
 
-impl Component for App {
-	type Props = Arc<AppStore>;
-
+impl Constructor for App {
 	fn create(props: Self::Props, scope: Scope<Self>) -> Self {
 		App {
 			store: props,
 			scope,
 		}
 	}
+}
+
+impl Component for App {
+	type Props = Arc<AppStore>;
 
 	fn render(&mut self, _ctx: &Render) -> Children {
 		let store = &self.store;

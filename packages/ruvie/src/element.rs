@@ -3,13 +3,13 @@ use std::{marker::PhantomData, sync::Arc};
 use crate::children::Children;
 use crate::component::{Component, Constructor};
 use crate::reference::Reference;
-use crate::{instance::Instance, scope::Scope, view::WeakView};
+use crate::{builder::DynFactory, instance::Instance, scope::Scope, view::WeakView};
 
 pub struct TypedElement<C>
 where
 	C: Component,
 {
-	pub(crate) component: PhantomData<C>,
+	pub(crate) factory: DynFactory<C>,
 	pub(crate) props: C::Props,
 	pub(crate) children: Children,
 	pub(crate) reference: Option<Reference>,
@@ -17,11 +17,11 @@ where
 
 impl<C> TypedElement<C>
 where
-	C: Component,
+	C: Constructor,
 {
 	pub fn new(props: C::Props, _children: Children) -> Self {
 		Self {
-			component: PhantomData,
+			factory: Box::new(PhantomData),
 			props: props,
 			reference: None,
 			children: None.into(),
@@ -31,7 +31,7 @@ where
 
 impl<C> From<TypedElement<C>> for Children
 where
-	C: Component + Constructor,
+	C: Component,
 {
 	fn from(typed: TypedElement<C>) -> Self {
 		Children::from(Element::from(typed))
@@ -66,7 +66,7 @@ impl Element {
 
 impl<C> From<TypedElement<C>> for Element
 where
-	C: Component + Constructor,
+	C: Component,
 {
 	fn from(el: TypedElement<C>) -> Self {
 		Element {
@@ -88,10 +88,10 @@ pub trait ElementFactory {
 
 impl<C> ElementFactory for TypedElement<C>
 where
-	C: Component + Constructor + 'static,
+	C: Component + 'static,
 {
 	fn instance(&self, view: WeakView) -> Box<dyn Instance> {
-		Box::new(C::create(self.props.clone(), Scope::new(view)))
+		Box::new(self.factory.create(self.props.clone(), Scope::new(view)))
 	}
 
 	fn children(&self) -> Children {

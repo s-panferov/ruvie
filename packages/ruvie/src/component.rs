@@ -1,4 +1,4 @@
-use std::{any::Any, hash::Hash, rc::Rc};
+use std::{any::Any, hash::Hash, marker::PhantomData, rc::Rc};
 
 use crate::children::Children;
 use crate::{
@@ -53,9 +53,9 @@ pub trait Component: Sized + 'static {
 	}
 }
 
-pub trait ComponentExt: Component {
+pub trait ComponentExt: Constructor {
 	fn with_props(props: Self::Props) -> ElementBuilder<Self> {
-		ElementBuilder::new(props)
+		ElementBuilder::new(Box::new(PhantomData), props)
 	}
 
 	fn prop<P: PropFor<Self> + Hash, V: Into<P::Value>>(prop: P, value: V) -> ElementBuilder<Self>
@@ -64,7 +64,7 @@ pub trait ComponentExt: Component {
 	{
 		let mut props = Props::new();
 		props.value_for(prop, value.into());
-		ElementBuilder::new(Rc::new(props))
+		ElementBuilder::new(Box::new(PhantomData), Rc::new(props))
 	}
 
 	fn dynamic() -> ElementBuilder<Self>
@@ -72,18 +72,18 @@ pub trait ComponentExt: Component {
 		Self: Component<Props = Rc<Props<Self>>>,
 	{
 		let props = Props::new();
-		ElementBuilder::new(Rc::new(props))
+		ElementBuilder::new(Box::new(PhantomData), Rc::new(props))
 	}
 
 	fn default() -> ElementBuilder<Self>
 	where
 		Self::Props: Default,
 	{
-		ElementBuilder::new(Default::default())
+		ElementBuilder::new(Box::new(PhantomData), Default::default())
 	}
 }
 
-impl<C> ComponentExt for C where C: Component {}
+impl<C> ComponentExt for C where C: Constructor {}
 
 impl<C> Instance for C
 where

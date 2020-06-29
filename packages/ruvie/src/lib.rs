@@ -1,5 +1,3 @@
-#![feature(min_specialization)]
-
 mod builder;
 mod children;
 mod component;
@@ -27,12 +25,12 @@ pub mod web;
 
 pub mod prelude {
 	pub use crate::builder::*;
-	pub use crate::component::{Component, ComponentExt};
-	pub use crate::props::DynamicProps;
+	pub use crate::component::ComponentExt;
+	pub use crate::func::{FunctionExt, FunctionWithPropsExt};
 }
 
 pub use children::Children;
-pub use component::Component;
+pub use component::{Component, Constructor};
 pub use element::Element;
 pub use handler::Handler;
 pub use props::Props;

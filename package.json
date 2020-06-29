@@ -2,6 +2,6 @@
   "name": "ruview",
   "private": true,
   "workspaces": [
-    "examples/simple/client*"
+    "examples/*"
   ]
 }
