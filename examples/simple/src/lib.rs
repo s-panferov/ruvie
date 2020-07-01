@@ -8,8 +8,11 @@ use observe::{transaction, Computed, MutObservable, Observable, Value, Var};
 use ruvie::{
 	context::Render,
 	contrib::list::{List, ListProps},
+	html::el::div,
+	html::props,
+	html::ClassList,
 	prelude::*,
-	web::{elem::div, Class, ClassList, Cursor, Style, Web},
+	web::{Cursor, Web},
 	Children, Component, Constructor, Element, Scope,
 };
 
@@ -58,8 +61,8 @@ impl Component for App {
 		let store = &self.store;
 		let payload = store.data.clone();
 
-		div::prop(Style, &store.style)
-			.prop(Class, ruvie::cx!("test"))
+		div::prop(props::Style, &store.style)
+			.prop(props::Class, ruvie::cx!("test"))
 			.scope(move |_ctx| {
 				let payload = payload.clone();
 				Value::from(Computed::new(move |eval| match &*payload.get(eval) {
@@ -143,7 +146,7 @@ pub fn run() -> Result<(), JsValue> {
 	mousemove.forget();
 	click.forget();
 
-	let rt = ruvie::Runtime::new(Web);
+	let rt = ruvie::Runtime::new(Web::new());
 
 	let view = rt.render(app, Box::new(Cursor::beginning_of(&body)?));
 

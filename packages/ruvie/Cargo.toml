@@ -21,8 +21,10 @@ harsh={version="*"}
 anyhow="*"
 thiserror="*"
 
-# DOM:
+# STATIC
+html5ever={version="*", optional=true}
 
+# DOM:
 js-sys= {version="0.3.39", optional=true}
 wasm-bindgen= {version = "0.2.62", optional=true}
 console_error_panic_hook = {version="0.1.6", optional=true}
@@ -45,9 +47,10 @@ web-sys = { version = "0.3.39", optional=true, features = [
 ] }
 
 [features]
-default=["web", "css"]
+default=["web", "static", "css"]
 css = ["ruvie-css"]
 web = ["js-sys", "web-sys", "wasm-bindgen", "console_error_panic_hook"]
+static = ["html5ever"]
 
 [dev-dependencies]
 criterion = "0.3"

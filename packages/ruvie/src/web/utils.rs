@@ -1,7 +1,7 @@
 use wasm_bindgen::JsValue;
 use web_sys::Node;
 
-use super::{fragment::ChildPosition, target::WebState, WebContext};
+use super::{fragment::ChildPosition, target::WebElementState, WebContext};
 use crate::{context::Mount, error::RuvieError, view::View};
 use std::hash::Hash;
 
@@ -18,7 +18,11 @@ pub fn mount_children(
 	for element in children.unwrap().into_iter() {
 		let child = ctx.view.render_child(element, None)?;
 		child.with_state(|state| {
-			let state = state.as_mut().unwrap().downcast_mut::<WebState>().unwrap();
+			let state = state
+				.as_mut()
+				.unwrap()
+				.downcast_mut::<WebElementState>()
+				.unwrap();
 			let child_fragment = &state.fragment;
 			if let Some(node) = node {
 				child_fragment

@@ -1,30 +1,39 @@
 use ruvie_css::StyleSheet;
-use std::{borrow::Cow, fmt::Display};
+use std::{
+	borrow::Cow,
+	fmt::{Display, Formatter},
+};
 
 #[derive(Debug, Hash, Clone)]
 pub enum ClassItem {
 	String(Cow<'static, str>),
-	StyleSheet(StyleSheet),
+	StyleSheet(Cow<'static, StyleSheet>),
 }
 
-impl Display for ClassItem {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			ClassItem::String(s) => write!(f, "{}", s),
-			ClassItem::StyleSheet(s) => {
-				let class_name = super::stylesheet::STYLES.with(|rt| {
-					let mut rt = rt.borrow_mut();
-					rt.inject(s)
-				});
-				write!(f, "{}", class_name)
-			}
-		}
-	}
+pub trait StyleRuntime {
+	fn inject(&self, style: &StyleSheet, f: &mut Formatter<'_>);
 }
 
 #[derive(Hash, Debug)]
 pub struct ClassList {
 	pub classes: Vec<ClassItem>,
+}
+
+pub struct ClassListFormatter<'a> {
+	list: &'a ClassList,
+	runtime: &'a dyn StyleRuntime,
+}
+
+impl<'a> Display for ClassListFormatter<'a> {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		for cls in &self.list.classes {
+			match cls {
+				ClassItem::String(class) => write!(f, "{}", class)?,
+				ClassItem::StyleSheet(sheet) => self.runtime.inject(&sheet, f),
+			}
+		}
+		Ok(())
+	}
 }
 
 impl ClassList {
@@ -39,20 +48,19 @@ impl ClassList {
 	pub fn push<I: Into<ClassItem>>(&mut self, class: I) {
 		self.classes.push(class.into())
 	}
-}
 
-impl Display for ClassList {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		for cls in &self.classes {
-			write!(f, "{}", cls)?
+	pub fn format(&self, runtime: &dyn StyleRuntime) -> String {
+		ClassListFormatter {
+			list: self,
+			runtime,
 		}
-		Ok(())
+		.to_string()
 	}
 }
 
 impl From<StyleSheet> for ClassItem {
 	fn from(v: StyleSheet) -> Self {
-		ClassItem::StyleSheet(v)
+		ClassItem::StyleSheet(Cow::Owned(v))
 	}
 }
 

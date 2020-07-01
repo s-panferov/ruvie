@@ -8,7 +8,7 @@ use crate::{
 	component::Constructor,
 	error::RuvieError,
 	scope::Scope,
-	web::WebState,
+	web::WebElementState,
 	web::{
 		fragment::{ChildPosition, FragmentChild},
 		WebContext,
@@ -199,7 +199,11 @@ where
 			if target.is::<WebContext>() {
 				let target = target.downcast_mut::<WebContext>().unwrap();
 				child.with_state(|state| {
-					let state = state.as_mut().unwrap().downcast_ref::<WebState>().unwrap();
+					let state = state
+						.as_mut()
+						.unwrap()
+						.downcast_ref::<WebElementState>()
+						.unwrap();
 					let child_fragment = &state.fragment;
 					target.fragment.child(child_fragment.clone());
 					Ok::<(), JsValue>(())
@@ -272,10 +276,13 @@ where
 
 		{
 			let state = self.view.state();
-			let fragment = &state.downcast_ref::<WebState>().unwrap().fragment;
+			let fragment = &state.downcast_ref::<WebElementState>().unwrap().fragment;
 
 			let child_state = child.state();
-			let child_fragment = &child_state.downcast_ref::<WebState>().unwrap().fragment;
+			let child_fragment = &child_state
+				.downcast_ref::<WebElementState>()
+				.unwrap()
+				.fragment;
 
 			let idx = self.next.get_full(key).unwrap().0;
 
@@ -289,7 +296,7 @@ where
 						.and_then(|r| self.list.children.get(r.0))
 						.map(|v| {
 							v.state()
-								.downcast_ref::<WebState>()
+								.downcast_ref::<WebElementState>()
 								.unwrap()
 								.fragment
 								.borrow()
@@ -318,10 +325,13 @@ where
 		match child {
 			Some(child) => {
 				let child_state = child.state();
-				let child_fragment = &child_state.downcast_ref::<WebState>().unwrap().fragment;
+				let child_fragment = &child_state
+					.downcast_ref::<WebElementState>()
+					.unwrap()
+					.fragment;
 				self.view
 					.state()
-					.downcast_ref::<WebState>()
+					.downcast_ref::<WebElementState>()
 					.unwrap()
 					.fragment
 					.borrow_mut()
@@ -342,7 +352,7 @@ where
 			.and_then(|r| self.list.children.get(r.0))
 			.map(|v| {
 				v.state()
-					.downcast_ref::<WebState>()
+					.downcast_ref::<WebElementState>()
 					.unwrap()
 					.fragment
 					.borrow()
@@ -352,10 +362,13 @@ where
 		let child = self.list.children.get(key).unwrap();
 
 		let child_state = child.state();
-		let child_fragment = &child_state.downcast_ref::<WebState>().unwrap().fragment;
+		let child_fragment = &child_state
+			.downcast_ref::<WebElementState>()
+			.unwrap()
+			.fragment;
 
 		let state = self.view.state();
-		let fragment = &state.downcast_ref::<WebState>().unwrap().fragment;
+		let fragment = &state.downcast_ref::<WebElementState>().unwrap().fragment;
 
 		fragment
 			.borrow_mut()

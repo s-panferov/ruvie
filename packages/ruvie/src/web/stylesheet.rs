@@ -6,41 +6,16 @@ use wasm_bindgen::JsCast;
 use std::{cell::RefCell, collections::BTreeSet};
 use web_sys::HtmlStyleElement;
 
-pub struct StylesRuntime {
+pub struct HtmlStyleElementRuntime {
+	body: RefCell<HtmlStyleElementRuntimeMut>,
+}
+
+struct HtmlStyleElementRuntimeMut {
 	node: Option<HtmlStyleElement>,
 	injected: BTreeSet<String>,
 }
 
-impl StylesRuntime {
-	fn new() -> Self {
-		StylesRuntime {
-			node: None,
-			injected: BTreeSet::new(),
-		}
-	}
-
-	pub fn inject(&mut self, sheet: &StyleSheet) -> String {
-		let encoder = Harsh::default();
-		let id = encoder.encode(&[fxhash::hash64(sheet)]);
-
-		if !self.injected.contains(&id) {
-			if self.node.is_none() {
-				self.init()
-			}
-
-			let node = self.node.as_ref().unwrap();
-			let window = web_sys::window().expect("no global `window` exists");
-			let document = window.document().expect("should have a document on window");
-
-			let text = document.create_text_node(&format!(".{} {{ {} }}", id, sheet.to_string()));
-			node.append_child(&text).unwrap();
-
-			self.injected.insert(id.clone());
-		}
-
-		id
-	}
-
+impl HtmlStyleElementRuntimeMut {
 	fn init(&mut self) {
 		let window = web_sys::window().expect("no global `window` exists");
 		let document = window.document().expect("should have a document on window");
@@ -58,9 +33,36 @@ impl StylesRuntime {
 	}
 }
 
-std::thread_local! {
-  /// This is an example for using doc comment attributes
-  pub static STYLES: RefCell<StylesRuntime> = {
-	  RefCell::new(StylesRuntime::new())
-  };
+impl HtmlStyleElementRuntime {
+	pub fn new() -> Self {
+		HtmlStyleElementRuntime {
+			body: RefCell::new(HtmlStyleElementRuntimeMut {
+				node: None,
+				injected: BTreeSet::new(),
+			}),
+		}
+	}
+}
+
+impl crate::html::StyleRuntime for HtmlStyleElementRuntime {
+	fn inject(&self, sheet: &StyleSheet, f: &mut std::fmt::Formatter<'_>) {
+		let encoder = Harsh::default();
+		let id = encoder.encode(&[fxhash::hash64(sheet)]);
+		if !self.body.borrow().injected.contains(&id) {
+			let mut mut_body = self.body.borrow_mut();
+			if mut_body.node.is_none() {
+				mut_body.init()
+			}
+
+			let node = mut_body.node.as_ref().unwrap();
+			let window = web_sys::window().expect("no global `window` exists");
+			let document = window.document().expect("should have a document on window");
+
+			let text = document.create_text_node(&format!(".{} {{ {} }}", id, sheet.to_string()));
+			node.append_child(&text).unwrap();
+
+			mut_body.injected.insert(id.clone());
+		}
+		write!(f, "{}", id).unwrap()
+	}
 }

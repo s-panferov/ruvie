@@ -9,13 +9,23 @@ use super::{
 	cursor::Cursor,
 	event::BoxedWebHandler,
 	fragment::{FragmentBuilder, PersistedFragment, SharedPersistedFragment},
+	stylesheet::HtmlStyleElementRuntime,
 	utils, WebContext,
 };
 
-#[derive(Clone, Debug)]
-pub struct Web;
+pub struct Web {
+	pub styles: super::stylesheet::HtmlStyleElementRuntime,
+}
 
-pub struct WebState {
+impl Web {
+	pub fn new() -> Self {
+		Web {
+			styles: HtmlStyleElementRuntime::new(),
+		}
+	}
+}
+
+pub struct WebElementState {
 	pub fragment: SharedPersistedFragment,
 	pub handlers: Vec<Box<dyn BoxedWebHandler>>,
 }
@@ -65,9 +75,13 @@ impl Target for Web {
 				}
 
 				let fragment = Rc::new(RefCell::new(fragment));
-				*state = Some(Box::new(WebState { fragment, handlers }))
+				*state = Some(Box::new(WebElementState { fragment, handlers }))
 			} else {
-				let rt = state.as_mut().unwrap().downcast_mut::<WebState>().unwrap();
+				let rt = state
+					.as_mut()
+					.unwrap()
+					.downcast_mut::<WebElementState>()
+					.unwrap();
 				rt.fragment
 					.borrow_mut()
 					.replace_children(&doc, fragment.children)?

@@ -19,7 +19,8 @@ pub trait Instance: Downcast {
 	}
 
 	fn mount(&mut self, ctx: &mut Mount, target: &mut dyn Any) -> Result<(), RuvieError> {
-		let platform = ctx.view.def.runtime.platform.clone();
+		let rt = ctx.view.def.runtime.clone();
+		let platform = &rt.platform;
 		platform.mount_component(ctx, target)
 	}
 

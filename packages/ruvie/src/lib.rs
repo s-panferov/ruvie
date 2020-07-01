@@ -7,7 +7,6 @@ mod element;
 mod error;
 mod func;
 mod handler;
-mod html;
 mod instance;
 mod props;
 mod reference;
@@ -22,6 +21,8 @@ pub use ruvie_css as css;
 
 #[cfg(feature = "web")]
 pub mod web;
+
+pub mod html;
 
 pub mod prelude {
 	pub use crate::builder::*;

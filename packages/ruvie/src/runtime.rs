@@ -35,7 +35,7 @@ impl Deref for Runtime {
 }
 
 pub struct RuntimeShared {
-	pub platform: Arc<dyn Target>,
+	pub platform: Box<dyn Target>,
 	state: RefCell<RuntimeMut>,
 }
 
@@ -50,7 +50,7 @@ impl Runtime {
 
 		Runtime {
 			body: Arc::new(RuntimeShared {
-				platform: Arc::new(platform),
+				platform: Box::new(platform),
 				state: RefCell::new(state),
 			}),
 		}

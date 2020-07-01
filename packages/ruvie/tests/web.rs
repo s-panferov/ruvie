@@ -5,8 +5,10 @@ use wasm_bindgen_test::{wasm_bindgen_test, wasm_bindgen_test_configure};
 use observe::{transaction, MutObservable, Observable, Value, Var};
 use ruvie::{
 	contrib::list::{IndexList, List, ListProps},
+	html::el::div,
+	html::props,
 	prelude::*,
-	web::{elem::div, Cursor, Id, Web},
+	web::{Cursor, Web},
 };
 
 use std::{cell::Cell, rc::Rc, sync::Arc};
@@ -36,14 +38,14 @@ fn list() {
 		hint: Default::default(),
 		list: Value::from(tasks.clone()),
 		item: Arc::new(move |_, task| {
-			div::prop(Id, task.id.to_string())
+			div::prop(props::Id, task.id.to_string())
 				.child(task.name.clone())
 				.build()
 		}),
 	})
 	.build();
 
-	let rt = ruvie::Runtime::manual(Web);
+	let rt = ruvie::Runtime::manual(Web::new());
 
 	let window = web_sys::window().expect("no global `window` exists");
 	let document = window.document().expect("should have a document on window");

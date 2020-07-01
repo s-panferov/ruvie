@@ -1,6 +1,8 @@
 use ruvie::prelude::*;
 use ruvie::{
-	web::{elem::div, Cursor, OnClick, Web},
+	html::el::div,
+	html::props,
+	web::{Cursor, Web},
 	Children,
 };
 
@@ -8,7 +10,7 @@ use ruvie::{context::Render, Handler};
 use wasm_bindgen::{prelude::*, JsValue};
 
 fn button(ctx: &Render) -> Children {
-	div::prop(OnClick::new(), Handler::new(|ev| {}))
+	div::prop(props::OnClick::new(), Handler::new(|ev| {}))
 		.children(ctx.children.clone())
 		.into()
 }
@@ -21,7 +23,7 @@ pub fn run() -> Result<(), JsValue> {
 	let document = window.document().expect("should have a document on window");
 	let body = document.body().expect("document should have a body");
 
-	let rt = ruvie::Runtime::new(Web);
+	let rt = ruvie::Runtime::new(Web::new());
 
 	let view = rt.render(button.default(), Box::new(Cursor::beginning_of(&body)?));
 

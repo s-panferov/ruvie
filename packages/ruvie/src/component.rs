@@ -47,8 +47,8 @@ pub trait Component: Sized + 'static {
 		ctx.view
 			.def()
 			.runtime
-			.platform
 			.clone()
+			.platform
 			.mount_component(ctx, target)
 	}
 }
