@@ -2,7 +2,7 @@ use crate::{
 	context::{Event, Update},
 	error::RuvieError,
 	reference::{Reference, TypedReference},
-	view::{ReactionCallback, WeakView},
+	view::{ReactionHandler, WeakView},
 	Component, Element, Handler, View,
 };
 
@@ -35,13 +35,13 @@ where
 	}
 
 	/// Wrap a reaction callback to be run in the context of the component
-	pub fn reaction<F>(&self, handler: F) -> ReactionCallback
+	pub fn reaction<F>(&self, handler: F) -> ReactionHandler
 	where
 		C: Component,
 		F: Fn(&mut C, &mut Update) -> Result<(), RuvieError> + 'static,
 	{
-		Box::new(move |view: &View, ctx: &mut _| {
-			view.with_instance(|component| {
+		Box::new(move |ctx: &mut _| {
+			ctx.view.with_instance(|component| {
 				(handler)(component.downcast_mut::<C>().expect("Type"), ctx)
 			})
 		})

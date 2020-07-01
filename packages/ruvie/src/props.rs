@@ -89,7 +89,7 @@ impl<C> Eq for BoxedValue<C> {}
 
 pub struct Props<C> {
 	_c: PhantomData<C>,
-	pub props: HashSet<BoxedValue<C>>,
+	props: HashSet<BoxedValue<C>>,
 }
 
 impl<C> Deref for Props<C> {

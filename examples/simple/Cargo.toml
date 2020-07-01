@@ -11,9 +11,6 @@ edition = "2018"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[profile.release]
-lto = true
-
 [features]
 # If you uncomment this line, it will enable `wee_alloc`:
 #default = ["wee_alloc"]

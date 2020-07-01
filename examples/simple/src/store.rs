@@ -43,7 +43,7 @@ pub struct Task {
 
 pub struct AppStore {
 	pub props: AppProps,
-	pub style: Computed<Option<StyleSheet>>,
+	pub style: Computed<StyleSheet>,
 	pub data: ComputedFuture<Result<api::TestResponse, HashableError>, WasmBindgen>,
 	pub tasks: Var<Arc<IndexList<usize, Task>>>,
 }
@@ -68,12 +68,7 @@ impl AppStore {
 		})
 	}
 
-	fn style(
-		x: &Value<i32>,
-		y: &Value<i32>,
-		theme: &Value<Theme>,
-		ev: &EvalContext,
-	) -> Option<StyleSheet> {
+	fn style(x: &Value<i32>, y: &Value<i32>, theme: &Value<Theme>, ev: &EvalContext) -> StyleSheet {
 		let mut style = StyleSheet::new();
 
 		style = style
@@ -89,7 +84,7 @@ impl AppStore {
 			style = style.background_color(Color::from(BasicColor::Red));
 		}
 
-		Some(style)
+		style
 	}
 
 	fn data(_ev: &EvalContext) -> impl Future<Output = Result<api::TestResponse, HashableError>> {

@@ -9,7 +9,7 @@ use ruvie::{
 	context::Render,
 	contrib::list::{List, ListProps},
 	prelude::*,
-	web::{elem::Div, Class, ClassList, Cursor, Style, Web},
+	web::{elem::div, Class, ClassList, Cursor, Style, Web},
 	Children, Component, Constructor, Element, Scope,
 };
 
@@ -36,7 +36,7 @@ impl App {
 		List::with_props(ListProps {
 			list: Value::from(self.store.tasks.clone()),
 			hint: Default::default(),
-			item: Arc::new(move |_, task| Div::default().child(task.title.clone()).build()),
+			item: Arc::new(move |_, task| div::default().child(task.title.clone()).build()),
 		})
 		.build()
 	}
@@ -58,7 +58,7 @@ impl Component for App {
 		let store = &self.store;
 		let payload = store.data.clone();
 
-		Div::prop(Style, &store.style)
+		div::prop(Style, &store.style)
 			.prop(Class, ruvie::cx!("test"))
 			.scope(move |_ctx| {
 				let payload = payload.clone();

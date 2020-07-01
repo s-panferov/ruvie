@@ -1,7 +1,7 @@
-use crate::{component::ComponentExt, context::Render, prelude::*, web::elem::Div, Children};
+use crate::{component::ComponentExt, context::Render, prelude::*, web::elem::div, Children};
 
 fn button(ctx: &Render) -> Children {
-	Div::default().scope(|ctx| button.default()).into()
+	div::default().scope(|ctx| button.default()).into()
 }
 
 fn app(ctx: &Render) -> Children {

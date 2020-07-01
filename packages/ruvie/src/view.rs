@@ -62,14 +62,13 @@ pub struct ViewMut {
 	is_render_scheduled: bool,
 	is_update_scheduled: bool,
 	update_res: Result<(), RuvieError>,
-	all_update_reactions: Vec<Tracker>,
-	invalidated_updates: HashSet<WeakTracker>,
+	all_reactions: Vec<Tracker>,
+	stale_reactions: HashSet<WeakTracker>,
 	references: HashMap<u64, WeakView>,
 	pub(crate) target: ManuallyDrop<Option<Box<dyn Any>>>,
 }
 
-pub type ReactionCallback =
-	Box<dyn for<'a> Fn(&'a View, &'a mut Update<'a>) -> Result<(), RuvieError>>;
+pub type ReactionHandler = Box<dyn for<'a> Fn(&'a mut Update<'a>) -> Result<(), RuvieError>>;
 
 impl Drop for ViewMut {
 	fn drop(&mut self) {
@@ -85,8 +84,8 @@ impl View {
 		let state = ViewMut {
 			children: ManuallyDrop::new(vec![]),
 			rendered_tree: None.into(),
-			all_update_reactions: vec![],
-			invalidated_updates: HashSet::new(),
+			all_reactions: vec![],
+			stale_reactions: HashSet::new(),
 			update_res: Ok(()),
 			is_render_scheduled: false,
 			is_update_scheduled: false,
@@ -230,7 +229,7 @@ impl View {
 		Ok(())
 	}
 
-	fn add_reaction(&self, handler: ReactionCallback) {
+	fn add_reaction(&self, handler: ReactionHandler) {
 		let rx = Tracker::new();
 		Tracker::set_eval(
 			&rx,
@@ -243,11 +242,9 @@ impl View {
 
 		rx.autorun();
 
-		self.write()
-			.invalidated_updates
-			.insert(Tracker::downgrade(&rx));
-
-		self.write().all_update_reactions.push(rx);
+		let mut mut_self = self.write();
+		mut_self.stale_reactions.insert(Tracker::downgrade(&rx));
+		mut_self.all_reactions.push(rx);
 	}
 
 	pub(crate) fn mount(&self, arg: Option<Box<dyn Any>>) -> Result<(), RuvieError> {
@@ -268,6 +265,7 @@ impl View {
 		} = ctx;
 
 		self.write().children = ManuallyDrop::new(children);
+
 		for reaction in reactions {
 			self.add_reaction(reaction)
 		}
@@ -296,7 +294,7 @@ impl View {
 		let updated = {
 			let mut state = self.write();
 			state.is_update_scheduled = false;
-			std::mem::replace(&mut state.invalidated_updates, HashSet::new())
+			std::mem::replace(&mut state.stale_reactions, HashSet::new())
 		};
 
 		for rx in updated {
@@ -390,7 +388,7 @@ impl Evaluation for RenderReaction {
 pub struct UpdateReaction {
 	pub view: WeakView,
 	pub rx: WeakTracker,
-	pub handler: Box<dyn for<'a> Fn(&'a View, &'a mut Update<'a>) -> Result<(), RuvieError>>,
+	pub handler: ReactionHandler,
 }
 
 impl Evaluation for UpdateReaction {
@@ -401,7 +399,7 @@ impl Evaluation for UpdateReaction {
 	fn eval(&self, eval: &EvalContext) -> u64 {
 		if let Some(view) = self.view.upgrade() {
 			let mut ctx = Update { eval, view: &view };
-			let res = (self.handler)(&view, &mut ctx);
+			let res = (self.handler)(&mut ctx);
 			view.write().update_res = res;
 		} else {
 			unreachable!()
@@ -412,7 +410,7 @@ impl Evaluation for UpdateReaction {
 	fn on_reaction(&self) {
 		if let Some(view) = self.view.upgrade() {
 			// FIXME move to instance
-			view.write().invalidated_updates.insert(self.rx.clone());
+			view.write().stale_reactions.insert(self.rx.clone());
 			// FIXME triggers several times, need to optimize in observe
 			view.schedule_update()
 		} else {

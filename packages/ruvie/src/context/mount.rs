@@ -1,10 +1,10 @@
-use crate::view::{ReactionCallback, View};
+use crate::view::{ReactionHandler, View};
 use crate::Children;
 
 pub struct Mount {
 	pub(crate) children: Vec<View>,
 	pub(crate) tree: Children,
-	pub(crate) reactions: Vec<ReactionCallback>,
+	pub(crate) reactions: Vec<ReactionHandler>,
 	pub(crate) view: View,
 }
 
@@ -13,7 +13,7 @@ impl Mount {
 		self.children.push(child);
 	}
 
-	pub fn reaction(&mut self, handler: ReactionCallback) {
+	pub fn reaction(&mut self, handler: ReactionHandler) {
 		self.reactions.push(handler);
 	}
 }

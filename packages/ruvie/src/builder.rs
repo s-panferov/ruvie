@@ -50,9 +50,9 @@ where
 		self
 	}
 
-	pub fn prop<P: PropFor<C> + Hash, V: Into<P::Value>>(mut self, prop: P, value: V) -> Self
+	pub fn prop<P: PropFor<T> + Hash, V: Into<P::Value>, T>(mut self, prop: P, value: V) -> Self
 	where
-		C: Component<Props = Rc<Props<C>>>,
+		C: Component<Props = Rc<Props<T>>>,
 	{
 		let props = Rc::get_mut(&mut self.props).unwrap();
 		props.value_for(prop, value.into());

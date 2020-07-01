@@ -1,14 +1,16 @@
 use ruvie::prelude::*;
 use ruvie::{
-	web::{elem::Div, Cursor, Web},
+	web::{elem::div, Cursor, OnClick, Web},
 	Children,
 };
 
-use ruvie::context::Render;
+use ruvie::{context::Render, Handler};
 use wasm_bindgen::{prelude::*, JsValue};
 
 fn button(ctx: &Render) -> Children {
-	Div::default().children(ctx.children.clone()).into()
+	div::prop(OnClick::new(), Handler::new(|ev| {}))
+		.children(ctx.children.clone())
+		.into()
 }
 
 #[wasm_bindgen(start)]

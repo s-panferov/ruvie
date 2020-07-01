@@ -68,7 +68,7 @@ where
 
 pub struct FuncWithPropsFactory<F, P>
 where
-	F: Fn(&P, &Render) -> Children + 'static,
+	F: Fn(P, &Render) -> Children + 'static,
 {
 	func: Arc<F>,
 	props: PhantomData<P>,
@@ -76,26 +76,26 @@ where
 
 pub struct FuncWithProps<F, P>
 where
-	F: Fn(&P, &Render) -> Children + 'static,
+	F: Fn(P, &Render) -> Children + 'static,
 {
 	func: Arc<F>,
-	props: P,
+	props: Option<P>,
 }
 
 impl<F, P> Factory<FuncWithProps<F, P>> for FuncWithPropsFactory<F, P>
 where
-	F: Fn(&P, &Render) -> Children + 'static,
+	F: Fn(P, &Render) -> Children + 'static,
 	P: Clone + 'static,
 {
 	fn create(&self, props: P, _scope: Scope<FuncWithProps<F, P>>) -> FuncWithProps<F, P> {
 		FuncWithProps {
 			func: self.func.clone(),
-			props,
+			props: Some(props),
 		}
 	}
 }
 
-pub trait FunctionWithPropsExt<P: Clone + 'static>: Fn(&P, &Render) -> Children + Sized {
+pub trait FunctionWithPropsExt<P: Clone + 'static>: Fn(P, &Render) -> Children + Sized {
 	fn with_props(self, props: P) -> ElementBuilder<FuncWithProps<Self, P>> {
 		ElementBuilder::new(
 			Box::new(FuncWithPropsFactory {
@@ -120,14 +120,12 @@ pub trait FunctionWithPropsExt<P: Clone + 'static>: Fn(&P, &Render) -> Children 
 	}
 }
 
-impl<F, P: Clone + 'static> FunctionWithPropsExt<P> for F where
-	F: Fn(&P, &Render) -> Children + Sized
-{
-}
+impl<F, P: Clone + 'static> FunctionWithPropsExt<P> for F where F: Fn(P, &Render) -> Children + Sized
+{}
 
 impl<F, P> Component for FuncWithProps<F, P>
 where
-	F: Fn(&P, &Render) -> Children + 'static,
+	F: Fn(P, &Render) -> Children + 'static,
 	P: Clone + 'static,
 {
 	type Props = P;
@@ -137,6 +135,6 @@ where
 	}
 
 	fn render(&mut self, ctx: &Render) -> Children {
-		(self.func)(&self.props, ctx)
+		(self.func)(self.props.take().unwrap(), ctx)
 	}
 }

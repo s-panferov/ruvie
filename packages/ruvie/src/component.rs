@@ -58,18 +58,18 @@ pub trait ComponentExt: Constructor {
 		ElementBuilder::new(Box::new(PhantomData), props)
 	}
 
-	fn prop<P: PropFor<Self> + Hash, V: Into<P::Value>>(prop: P, value: V) -> ElementBuilder<Self>
+	fn prop<P: PropFor<T> + Hash, V: Into<P::Value>, T>(prop: P, value: V) -> ElementBuilder<Self>
 	where
-		Self: Component<Props = Rc<Props<Self>>>,
+		Self: Component<Props = Rc<Props<T>>>,
 	{
 		let mut props = Props::new();
 		props.value_for(prop, value.into());
 		ElementBuilder::new(Box::new(PhantomData), Rc::new(props))
 	}
 
-	fn dynamic() -> ElementBuilder<Self>
+	fn dynamic<T>() -> ElementBuilder<Self>
 	where
-		Self: Component<Props = Rc<Props<Self>>>,
+		Self: Component<Props = Rc<Props<T>>>,
 	{
 		let props = Props::new();
 		ElementBuilder::new(Box::new(PhantomData), Rc::new(props))

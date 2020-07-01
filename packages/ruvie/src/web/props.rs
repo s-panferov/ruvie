@@ -9,12 +9,22 @@ use web_sys::{InputEvent, MouseEvent};
 pub struct Style;
 
 impl Prop for Style {
-	type Value = Value<Option<StyleSheet>>;
+	type Value = Value<StyleSheet>;
 }
 
 #[derive(Hash)]
 pub struct OnClick {
 	pub capture: bool,
+}
+
+impl OnClick {
+	pub fn new() -> OnClick {
+		OnClick { capture: false }
+	}
+
+	pub fn capture() -> OnClick {
+		OnClick { capture: true }
+	}
 }
 
 impl Prop for OnClick {
@@ -32,7 +42,7 @@ impl Prop for OnBeforeInput {
 pub struct ContentEditable;
 
 impl Prop for ContentEditable {
-	type Value = Value<Option<bool>>;
+	type Value = Value<bool>;
 }
 
 #[derive(Hash)]

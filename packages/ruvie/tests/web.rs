@@ -6,7 +6,7 @@ use observe::{transaction, MutObservable, Observable, Value, Var};
 use ruvie::{
 	contrib::list::{IndexList, List, ListProps},
 	prelude::*,
-	web::{elem::Div, Cursor, Id, Web},
+	web::{elem::div, Cursor, Id, Web},
 };
 
 use std::{cell::Cell, rc::Rc, sync::Arc};
@@ -36,7 +36,7 @@ fn list() {
 		hint: Default::default(),
 		list: Value::from(tasks.clone()),
 		item: Arc::new(move |_, task| {
-			Div::prop(Id, task.id.to_string())
+			div::prop(Id, task.id.to_string())
 				.child(task.name.clone())
 				.build()
 		}),
