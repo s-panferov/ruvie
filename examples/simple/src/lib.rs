@@ -61,8 +61,8 @@ impl Component for App {
 		let store = &self.store;
 		let payload = store.data.clone();
 
-		div::prop(props::Style, &store.style)
-			.prop(props::Class, ruvie::cx!("test"))
+		div::prop(props::Style::StyleSheet(store.style.clone().into()))
+			.prop(props::Class(ruvie::cx!("test").into()))
 			.scope(move |_ctx| {
 				let payload = payload.clone();
 				Value::from(Computed::new(move |eval| match &*payload.get(eval) {

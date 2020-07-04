@@ -10,9 +10,12 @@ use ruvie::{context::Render, Handler};
 use wasm_bindgen::{prelude::*, JsValue};
 
 fn button(ctx: &Render) -> Children {
-	div::prop(props::OnClick::new(), Handler::new(|ev| {}))
-		.children(ctx.children.clone())
-		.into()
+	div::prop(props::OnClick::EventListener {
+		capture: false,
+		handler: Handler::new(|ev| {}),
+	})
+	.children(ctx.children.clone())
+	.into()
 }
 
 #[wasm_bindgen(start)]

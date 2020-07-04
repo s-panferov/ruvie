@@ -5,6 +5,8 @@ use wasm_bindgen::{prelude::*, JsCast};
 use crate::runtime::Runtime;
 use crate::{context::Mount, error::RuvieError, target::Target, View};
 
+use web_sys::Node;
+
 use super::{
 	cursor::Cursor,
 	event::BoxedWebHandler,
@@ -45,7 +47,14 @@ impl Target for Web {
 		ctx: &mut Mount,
 		arg: Option<Box<dyn Any>>,
 	) -> Result<(), RuvieError> {
-		let cursor = arg.map(|a| a.downcast::<Cursor>().unwrap());
+		let cursor = arg.map(|a| {
+			if a.is::<Node>() {
+				Cursor::beginning_of(a.downcast_ref::<Node>().unwrap()).unwrap()
+			} else {
+				let cursor = a.downcast::<Cursor>().unwrap();
+				*cursor
+			}
+		});
 
 		let window = web_sys::window().expect("no global `window` exists");
 		let document = window.document().expect("should have a document on window");

@@ -26,6 +26,12 @@ impl Component for HtmlElement {
 			self.mount_web(ctx, target)?
 		}
 
+		#[cfg(feature = "ssr")]
+		if target.is::<crate::ssr::StaticContext>() {
+			let target = target.downcast_mut::<crate::ssr::StaticContext>().unwrap();
+			self.mount_static(ctx, target)?
+		}
+
 		Ok(())
 	}
 }
@@ -33,9 +39,7 @@ impl Component for HtmlElement {
 impl PropFor<HtmlElement> for props::Style {}
 impl PropFor<HtmlElement> for props::Class {}
 impl PropFor<HtmlElement> for props::ContentEditable {}
-impl PropFor<HtmlElement> for props::OnClick {}
 impl PropFor<HtmlElement> for props::Id {}
-impl PropFor<HtmlElement> for props::OnBeforeInput {}
 
 macro_rules! elem {
 	($el:ident) => {

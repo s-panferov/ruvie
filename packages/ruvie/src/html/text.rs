@@ -21,11 +21,19 @@ impl Constructor for Text {
 impl Component for Text {
 	type Props = Value<String>;
 
-	fn mount(&mut self, ctx: &mut Mount, target: &mut dyn Any) -> Result<(), RuvieError> {
+	fn mount(&mut self, ctx: &mut Mount, impl_ctx: &mut dyn Any) -> Result<(), RuvieError> {
 		#[cfg(feature = "web")]
-		if target.is::<crate::web::WebContext>() {
-			let target = target.downcast_mut::<crate::web::WebContext>().unwrap();
-			self.mount_web(ctx, target)?
+		if impl_ctx.is::<crate::web::WebContext>() {
+			let impl_ctx = impl_ctx.downcast_mut::<crate::web::WebContext>().unwrap();
+			self.mount_web(ctx, impl_ctx)?
+		}
+
+		#[cfg(feature = "ssr")]
+		if impl_ctx.is::<crate::ssr::Static>() {
+			let impl_ctx = impl_ctx
+				.downcast_mut::<crate::ssr::StaticContext>()
+				.unwrap();
+			self.mount_static(ctx, impl_ctx)?
 		}
 
 		Ok(())

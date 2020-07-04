@@ -10,25 +10,27 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-downcast-rs= "1.1.1"
+downcast-rs="^1.1"
 observe={path = "../../../observe/packages/observe"}
 ruvie-css={path = "../ruvie-css", optional=true}
-snowflake = "1.3.0"
-fxhash="*"
-parking_lot="*"
-indexmap="*"
-harsh={version="*"}
-anyhow="*"
-thiserror="*"
+snowflake = "^1.3"
+fxhash="^0.2"
+parking_lot="^0.11"
+indexmap="^1.4"
+harsh={version="^0.2"}
+anyhow="^1"
+thiserror="^1"
 
 # STATIC
-html5ever={version="*", optional=true}
+html5ever={version="^0.25", optional=true}
+markup5ever={version="^0.10", optional=true}
+markup5ever_rcdom={version="^0.1", optional=true}
 
 # DOM:
-js-sys= {version="0.3.39", optional=true}
-wasm-bindgen= {version = "0.2.62", optional=true}
-console_error_panic_hook = {version="0.1.6", optional=true}
-web-sys = { version = "0.3.39", optional=true, features = [
+js-sys= {version="^0.3", optional=true}
+wasm-bindgen= {version = "^0.2", optional=true}
+console_error_panic_hook = {version="^0.1", optional=true}
+web-sys = { version = "^0.3", optional=true, features = [
   "console",
   "DocumentFragment",
   'Document',
@@ -47,15 +49,15 @@ web-sys = { version = "0.3.39", optional=true, features = [
 ] }
 
 [features]
-default=["web", "static", "css"]
+default=["web", "ssr", "css"]
 css = ["ruvie-css"]
 web = ["js-sys", "web-sys", "wasm-bindgen", "console_error_panic_hook"]
-static = ["html5ever"]
+ssr = ["html5ever", "markup5ever_rcdom", "markup5ever"]
 
 [dev-dependencies]
 criterion = "0.3"
-rand={version= "*", features = ["wasm-bindgen"]}
-wasm-bindgen-test = "0.3.0"
+rand={version= "^0.7", features = ["wasm-bindgen"]}
+wasm-bindgen-test = "^0.3"
 
 # [[bench]]
 # name = "diff"

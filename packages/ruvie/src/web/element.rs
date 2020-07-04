@@ -6,6 +6,7 @@ use crate::{
 	context::Mount,
 	error::RuvieError,
 	html::{props, HtmlElement},
+	props::PropFor,
 };
 
 use observe::Observable;
@@ -32,6 +33,9 @@ macro_rules! attr {
 	};
 }
 
+impl PropFor<HtmlElement> for props::OnBeforeInput {}
+impl PropFor<HtmlElement> for props::OnClick {}
+
 impl HtmlElement {
 	pub(crate) fn mount_web(
 		&mut self,
@@ -43,19 +47,38 @@ impl HtmlElement {
 		target.fragment.child(el.clone().unchecked_into::<Node>());
 		utils::mount_children(ctx, target, Some(&el))?;
 
-		for prop in self.props.iter() {
+		for prop in self.props.values() {
 			let el = el.clone();
-			if let Some((_, ev)) = prop.downcast::<props::OnClick>() {
-				target.handler(Box::new(bind(ev, &el, "click")?));
-			} else if let Some((_, ev)) = prop.downcast::<props::OnBeforeInput>() {
-				target.handler(Box::new(bind(ev, &el, "beforeinput")?));
-			} else if let Some((_, style)) = prop.downcast::<props::Style>() {
-				let style = style.clone();
-				ctx.reaction(Box::new(move |ctx| {
-					dynattr!(el, "style", &mut ctx.eval, style);
-					Ok(())
-				}))
-			} else if let Some((_, classlist)) = prop.downcast::<props::Class>() {
+			if let Some(ev) = prop.downcast_ref::<props::OnClick>() {
+				match ev {
+					props::OnClick::EventListener { handler, .. } => {
+						target.handler(Box::new(bind(handler, &el, "click")?));
+					}
+				}
+			} else if let Some(ev) = prop.downcast_ref::<props::OnBeforeInput>() {
+				match ev {
+					props::OnBeforeInput::EventListener { handler, .. } => {
+						target.handler(Box::new(bind(handler, &el, "beforeinput")?));
+					}
+				}
+			} else if let Some(style) = prop.downcast_ref::<props::Style>() {
+				match style {
+					props::Style::String(value) => {
+						let value = value.clone();
+						ctx.reaction(Box::new(move |ctx| {
+							dynattr!(el, "style", &mut ctx.eval, value);
+							Ok(())
+						}))
+					}
+					props::Style::StyleSheet(sheet) => {
+						let sheet = sheet.clone();
+						ctx.reaction(Box::new(move |ctx| {
+							dynattr!(el, "style", &mut ctx.eval, sheet);
+							Ok(())
+						}))
+					}
+				}
+			} else if let Some(props::Class(classlist)) = prop.downcast_ref() {
 				let classlist = classlist.clone();
 				ctx.reaction({
 					let rt = ctx.view.def.runtime.clone();
@@ -66,13 +89,13 @@ impl HtmlElement {
 						Ok(())
 					})
 				})
-			} else if let Some((_, contenteditable)) = prop.downcast::<props::ContentEditable>() {
+			} else if let Some(props::ContentEditable(contenteditable)) = prop.downcast_ref() {
 				let contenteditable = contenteditable.clone();
 				ctx.reaction(Box::new(move |ctx| {
 					dynattr!(el, "contenteditable", &mut ctx.eval, contenteditable);
 					Ok(())
 				}))
-			} else if let Some((_, id)) = prop.downcast::<props::Id>() {
+			} else if let Some(props::Id(id)) = prop.downcast_ref() {
 				attr!(el, "id", id);
 			}
 		}

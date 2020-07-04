@@ -1,4 +1,6 @@
+#[cfg(feature = "css")]
 use ruvie_css::StyleSheet;
+
 use std::{
 	borrow::Cow,
 	fmt::{Display, Formatter},
@@ -7,10 +9,13 @@ use std::{
 #[derive(Debug, Hash, Clone)]
 pub enum ClassItem {
 	String(Cow<'static, str>),
+
+	#[cfg(feature = "css")]
 	StyleSheet(Cow<'static, StyleSheet>),
 }
 
 pub trait StyleRuntime {
+	#[cfg(feature = "css")]
 	fn inject(&self, style: &StyleSheet, f: &mut Formatter<'_>);
 }
 
@@ -29,6 +34,7 @@ impl<'a> Display for ClassListFormatter<'a> {
 		for cls in &self.list.classes {
 			match cls {
 				ClassItem::String(class) => write!(f, "{}", class)?,
+				#[cfg(feature = "css")]
 				ClassItem::StyleSheet(sheet) => self.runtime.inject(&sheet, f),
 			}
 		}
@@ -58,6 +64,7 @@ impl ClassList {
 	}
 }
 
+#[cfg(feature = "css")]
 impl From<StyleSheet> for ClassItem {
 	fn from(v: StyleSheet) -> Self {
 		ClassItem::StyleSheet(Cow::Owned(v))
@@ -79,10 +86,10 @@ impl From<String> for ClassItem {
 #[macro_export]
 macro_rules! cx {
 	($($class:expr $(=> if $test:expr)?),*) => [{
-		let mut list = ClassList::new(vec![]);
+		let mut list = $crate::html::ClassList::new(vec![]);
 
 		$(
-			ruvie::cx_inner!(list, $class $(=> if $test)* );
+			$crate::cx_inner!(list, $class $(=> if $test)* );
 		)*
 
 		list

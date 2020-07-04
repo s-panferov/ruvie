@@ -1,4 +1,4 @@
-use std::{any::Any, hash::Hash, marker::PhantomData, rc::Rc};
+use std::{any::Any, marker::PhantomData, rc::Rc};
 
 use crate::children::Children;
 use crate::{
@@ -42,14 +42,14 @@ pub trait Component: Sized + 'static {
 		write!(f, "View")
 	}
 
-	fn mount(&mut self, ctx: &mut Mount, target: &mut dyn Any) -> Result<(), RuvieError> {
+	fn mount(&mut self, ctx: &mut Mount, impl_ctx: &mut dyn Any) -> Result<(), RuvieError> {
 		// FIXME replace .clone() with a Platform::mount_component
 		ctx.view
 			.def()
 			.runtime
 			.clone()
 			.platform
-			.mount_component(ctx, target)
+			.mount_component(ctx, impl_ctx)
 	}
 }
 
@@ -58,12 +58,12 @@ pub trait ComponentExt: Constructor {
 		ElementBuilder::new(Box::new(PhantomData), props)
 	}
 
-	fn prop<P: PropFor<T> + Hash, V: Into<P::Value>, T>(prop: P, value: V) -> ElementBuilder<Self>
+	fn prop<P: PropFor<T>, T>(prop: P) -> ElementBuilder<Self>
 	where
 		Self: Component<Props = Rc<Props<T>>>,
 	{
 		let mut props = Props::new();
-		props.value_for(prop, value.into());
+		props.value_for(prop);
 		ElementBuilder::new(Box::new(PhantomData), Rc::new(props))
 	}
 

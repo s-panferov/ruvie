@@ -22,6 +22,9 @@ pub use ruvie_css as css;
 #[cfg(feature = "web")]
 pub mod web;
 
+#[cfg(feature = "ssr")]
+pub mod ssr;
+
 pub mod html;
 
 pub mod prelude {

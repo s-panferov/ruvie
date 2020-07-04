@@ -38,7 +38,7 @@ fn list() {
 		hint: Default::default(),
 		list: Value::from(tasks.clone()),
 		item: Arc::new(move |_, task| {
-			div::prop(props::Id, task.id.to_string())
+			div::prop(props::Id(task.id.to_string()))
 				.child(task.name.clone())
 				.build()
 		}),

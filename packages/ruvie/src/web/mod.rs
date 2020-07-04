@@ -9,6 +9,7 @@ mod element;
 mod event;
 pub mod fragment;
 mod mount;
+pub mod props;
 mod stylesheet;
 mod target;
 mod text;
