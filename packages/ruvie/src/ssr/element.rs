@@ -29,7 +29,7 @@ impl HtmlElement {
 						attrs.push(Attribute {
 							name: QualName::new(
 								None,
-								Namespace::from("http://www.w3.org/1999/xhtml"),
+								Namespace::from(""),
 								LocalName::from("style"),
 							),
 							value: style.to_string().into(),
@@ -40,7 +40,7 @@ impl HtmlElement {
 						attrs.push(Attribute {
 							name: QualName::new(
 								None,
-								Namespace::from("http://www.w3.org/1999/xhtml"),
+								Namespace::from(""),
 								LocalName::from("style"),
 							),
 							value: style.to_string().into(),
@@ -53,11 +53,7 @@ impl HtmlElement {
 				let platform = rt.platform.downcast_ref::<Static>().unwrap();
 				let list = classlist.format(&platform.styles);
 				attrs.push(Attribute {
-					name: QualName::new(
-						None,
-						Namespace::from("http://www.w3.org/1999/xhtml"),
-						LocalName::from("class"),
-					),
+					name: QualName::new(None, Namespace::from(""), LocalName::from("class")),
 					value: list.into(),
 				});
 			} else if let Some(props::ContentEditable(contenteditable)) = prop.downcast_ref() {
@@ -65,18 +61,14 @@ impl HtmlElement {
 				attrs.push(Attribute {
 					name: QualName::new(
 						None,
-						Namespace::from("http://www.w3.org/1999/xhtml"),
+						Namespace::from(""),
 						LocalName::from("contenteditable"),
 					),
 					value: contenteditable.to_string().into(),
 				});
 			} else if let Some(props::Id(id)) = prop.downcast_ref() {
 				attrs.push(Attribute {
-					name: QualName::new(
-						None,
-						Namespace::from("http://www.w3.org/1999/xhtml"),
-						LocalName::from("id"),
-					),
+					name: QualName::new(None, Namespace::from(""), LocalName::from("id")),
 					value: id.clone().into(),
 				});
 			}
@@ -88,7 +80,7 @@ impl HtmlElement {
 			data: NodeData::Element {
 				name: QualName::new(
 					None,
-					Namespace::from("http://www.w3.org/1999/xhtml"),
+					Namespace::from(""),
 					LocalName::from(self.kind.clone()),
 				),
 				attrs: RefCell::new(attrs),

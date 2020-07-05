@@ -5,6 +5,7 @@ use crate::{
 	prelude::*,
 	Children,
 };
+
 use observe::Value;
 
 fn button(ctx: &Render) -> Children {
@@ -13,18 +14,4 @@ fn button(ctx: &Render) -> Children {
 
 fn app(ctx: &Render) -> Children {
 	button.default().into()
-}
-
-#[cfg(test)]
-mod test {
-	use super::*;
-	use crate::{ssr::Static, Runtime};
-
-	#[test]
-	fn test() {
-		let rt = Runtime::new(Static::new());
-		let view = rt.render(app.default(), Box::new(())).unwrap();
-		rt.tick().unwrap();
-		assert_eq!(crate::ssr::stringify(&view), "test")
-	}
 }
