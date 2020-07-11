@@ -27,10 +27,11 @@ impl Target for Static {
 
 		view.with_instance(|component| component.mount(ctx, &mut html))?;
 
-		let StaticContext { fragment, .. } = html;
+		let StaticContext { mut fragment, .. } = html;
 
 		view.with_state(|state| {
 			if state.is_none() {
+				super::fragment::wrap_fragment(&mut fragment, view.name());
 				*state = Some(Box::new(StaticElementState { fragment }))
 			} else {
 				unreachable!("Updates should not happen in static mode")

@@ -1,9 +1,13 @@
 use super::{target::StaticElementState, StaticContext};
 use crate::{context::Mount, error::RuvieError, view::View};
 use html5ever::serialize;
-use markup5ever_rcdom::{Node, SerializableHandle};
+use markup5ever_rcdom::{Node, NodeData, SerializableHandle};
 use serialize::SerializeOpts;
-use std::hash::Hash;
+use std::{
+	cell::{Cell, RefCell},
+	hash::Hash,
+	rc::Rc,
+};
 
 pub fn mount_children(
 	ctx: &mut Mount,
@@ -32,7 +36,12 @@ pub fn stringify(view: &View) -> String {
 			.downcast_ref::<StaticElementState>()
 			.unwrap();
 
-		state.fragment[0].clone().into()
+		Rc::new(Node {
+			parent: Cell::new(None),
+			children: RefCell::new(state.fragment.clone()),
+			data: NodeData::Document,
+		})
+		.into()
 	});
 
 	serialize(
@@ -40,7 +49,7 @@ pub fn stringify(view: &View) -> String {
 		&document,
 		SerializeOpts {
 			scripting_enabled: false,
-			traversal_scope: serialize::TraversalScope::IncludeNode,
+			traversal_scope: serialize::TraversalScope::ChildrenOnly(None),
 			create_missing_parent: false,
 		},
 	)

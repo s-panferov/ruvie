@@ -31,11 +31,15 @@ pub struct ClassListFormatter<'a> {
 
 impl<'a> Display for ClassListFormatter<'a> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-		for cls in &self.list.classes {
+		let len = self.list.classes.len();
+		for (i, cls) in self.list.classes.iter().enumerate() {
 			match cls {
 				ClassItem::String(class) => write!(f, "{}", class)?,
 				#[cfg(feature = "css")]
 				ClassItem::StyleSheet(sheet) => self.runtime.inject(&sheet, f),
+			}
+			if i < len - 1 {
+				write!(f, " ")?
 			}
 		}
 		Ok(())

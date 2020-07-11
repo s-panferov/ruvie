@@ -1,5 +1,6 @@
 use harsh::Harsh;
 use ruvie_css::StyleSheet;
+use std::fmt::Write;
 
 use std::{cell::RefCell, collections::BTreeMap};
 
@@ -18,6 +19,15 @@ impl StaticStyleRuntime {
 				styles: BTreeMap::new(),
 			}),
 		}
+	}
+
+	pub fn serialize(&self) -> String {
+		let mut buf = String::new();
+		for (sel, style) in self.body.borrow().styles.iter() {
+			write!(buf, ".{} {{ {} }}", sel, style).unwrap()
+		}
+
+		buf
 	}
 }
 

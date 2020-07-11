@@ -8,7 +8,7 @@ use crate::{
 	Children, Element, Scope,
 };
 
-use std::{hash::Hash, marker::PhantomData, rc::Rc};
+use std::{marker::PhantomData, rc::Rc};
 
 pub trait Factory<C: Component> {
 	fn create(&self, props: C::Props, scope: Scope<C>) -> C;

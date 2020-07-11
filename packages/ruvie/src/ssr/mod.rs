@@ -1,4 +1,5 @@
 mod element;
+mod fragment;
 mod stylesheet;
 mod target;
 mod text;
